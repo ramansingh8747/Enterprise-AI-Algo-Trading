@@ -1,0 +1,1 @@
+import{j as e}from"./index-lE9wYGcK.js";function s(){return e.jsxDEV("h1",{children:"404"},void 0,!1,{fileName:"C:/Users/HP/Music/projects/Enterprise-AI-Algo-Trading/backend/frontend/src/pages/errors/NotFound.tsx",lineNumber:1,columnNumber:49},this)}export{s as default};

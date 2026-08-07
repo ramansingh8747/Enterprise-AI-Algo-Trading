@@ -1,0 +1,1 @@
+import{j as e}from"./index-lE9wYGcK.js";function s(){return e.jsxDEV("h1",{children:"Dashboard"},void 0,!1,{fileName:"C:/Users/HP/Music/projects/Enterprise-AI-Algo-Trading/backend/frontend/src/pages/dashboard/DashboardPage.tsx",lineNumber:1,columnNumber:50},this)}export{s as default};
