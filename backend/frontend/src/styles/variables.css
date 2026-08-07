@@ -1,0 +1,13 @@
+:root {
+  --color-primary: #0070f3;
+  --color-background: #ffffff;
+  --color-text: #000000;
+  --spacing-small: 8px;
+  --spacing-medium: 16px;
+  --spacing-large: 24px;
+}
+
+[data-theme='dark'] {
+  --color-background: #111111;
+  --color-text: #ffffff;
+}
