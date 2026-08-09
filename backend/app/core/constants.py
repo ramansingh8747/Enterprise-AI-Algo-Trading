@@ -1,4 +1,5 @@
 from typing import Final
+from enum import Enum
 
 # API Versioning
 API_V1_STR: Final[str] = "/api/v1"
@@ -14,3 +15,9 @@ APP_DESCRIPTION: Final[str] = "Enterprise-grade AI Algo Trading Platform Infrast
 # HTTP Headers
 X_REQUEST_ID_HEADER: Final[str] = "X-Request-ID"
 X_PROCESS_TIME_HEADER: Final[str] = "X-Process-Time"
+
+
+class Environment(str, Enum):
+    DEVELOPMENT = "development"
+    STAGING = "staging"
+    PRODUCTION = "production"
