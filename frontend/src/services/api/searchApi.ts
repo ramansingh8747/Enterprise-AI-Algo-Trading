@@ -3,7 +3,7 @@ import { SearchResult } from '@/types/globalSearch';
 
 export interface GlobalSearchResponseDto {
   query: string;
-  total_results: int;
+  total_results: number;
   results: SearchResult[];
 }
 
@@ -18,9 +18,9 @@ export class SearchApi extends BaseApi {
     }
 
     try {
-      const response = await this.get<{ query: string; total_results: number; results: SearchResult[] }>(
-        '/api/v1/search',
-        { params }
+      const response = await this.handleRequest<{ query: string; total_results: number; results: SearchResult[] }>(
+        this.http.get('/api/v1/search', { params }),
+        false
       );
       return response.results || [];
     } catch (error) {

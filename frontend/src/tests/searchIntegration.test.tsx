@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { searchApi } from '@/services/api/searchApi';
 import { searchGlobalAsync } from '@/services/paperTrading/globalSearchService';
 import { SearchCommandCenter } from '@/components/dashboard/SearchCommandCenter';
+import type { SearchResult } from '@/types/globalSearch';
 
 describe('Global Workspace Search Integration', () => {
   beforeEach(() => {
@@ -11,7 +12,7 @@ describe('Global Workspace Search Integration', () => {
   });
 
   it('searchApi executes GET /api/v1/search and returns search results', async () => {
-    const mockResults = [
+    const mockResults: SearchResult[] = [
       { id: 'eq-RELIANCE', category: 'EQUITY', title: 'RELIANCE', subtitle: 'Reliance Industries', action: 'OPEN_ORDER' },
       { id: 'strat-1', category: 'STRATEGY', title: 'Alpha Momentum', subtitle: 'MOMENTUM', action: 'NAVIGATE' },
     ];
@@ -25,7 +26,7 @@ describe('Global Workspace Search Integration', () => {
   });
 
   it('searchGlobalAsync calls searchApi and returns server results', async () => {
-    const mockResults = [
+    const mockResults: SearchResult[] = [
       { id: 'journal-1', category: 'JOURNAL', title: 'Journal: RELIANCE', subtitle: '2026-08-11', action: 'NAVIGATE' },
     ];
 
@@ -45,7 +46,7 @@ describe('Global Workspace Search Integration', () => {
   });
 
   it('SearchCommandCenter modal renders, debounces search, and renders search results', async () => {
-    const mockResults = [
+    const mockResults: SearchResult[] = [
       { id: 'eq-TCS', category: 'EQUITY', title: 'TCS', subtitle: 'Tata Consultancy Services', action: 'OPEN_ORDER' },
     ];
 
