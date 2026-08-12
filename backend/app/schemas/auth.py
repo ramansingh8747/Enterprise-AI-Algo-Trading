@@ -40,6 +40,13 @@ class RegisterRequest(BaseModel):
         description="The user's platform role. Defaults to TRADER.",
     )
 
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: UserRole) -> UserRole:
+        if v == UserRole.ADMIN:
+            raise ValueError("Registration with ADMIN role is prohibited.")
+        return v
+
     @field_validator("email")
     @classmethod
     def normalise_email(cls, v: str) -> str:

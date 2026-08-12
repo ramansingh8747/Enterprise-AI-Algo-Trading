@@ -48,13 +48,17 @@ class AuthenticationService:
         if self._repo.exists_by_username(payload.username):
             raise UserAlreadyExistsException(payload.username)
 
+        assigned_role = payload.role
+        if assigned_role == UserRole.ADMIN:
+            assigned_role = UserRole.TRADER
+
         user: User = self._repo.create(
             {
                 "email": payload.email,
                 "username": payload.username,
                 "full_name": payload.full_name,
                 "password_hash": PasswordService.hash_password(payload.password),
-                "role": payload.role,
+                "role": assigned_role,
                 "is_active": True,
                 "is_verified": False,
             }

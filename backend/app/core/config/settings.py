@@ -1,6 +1,6 @@
 from functools import lru_cache
 from typing import Any
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +24,20 @@ class Settings(BaseSettings):
     BROKER_SECRET_KEY: str
     PASSWORD_MIN_LENGTH: int = 8
     CORS_ALLOWED_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+
+    @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
+
+    @model_validator(mode="after")
+    def validate_production_cors(self) -> "Settings":
+        if self.ENVIRONMENT.lower() == "production" or not self.DEBUG:
+            if "*" in self.CORS_ALLOWED_ORIGINS:
+                raise ValueError("CORS allow_origins cannot contain '*' in production environment.")
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

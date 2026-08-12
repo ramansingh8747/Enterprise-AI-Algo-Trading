@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, status
 from typing import Annotated
-from app.dependencies.auth import get_current_active_user
+from app.dependencies.auth import get_current_active_user_ws
 from app.schemas.auth import UserResponse
 from app.dependencies.event_bus import get_connection_manager
 from app.services.event_bus.connection_manager import WebSocketConnectionManager
@@ -10,7 +10,7 @@ router = APIRouter()
 @router.websocket("/ws")
 async def websocket_endpoint(
     websocket: WebSocket,
-    current_user: Annotated[UserResponse, Depends(get_current_active_user)],
+    current_user: Annotated[UserResponse, Depends(get_current_active_user_ws)],
     manager: Annotated[WebSocketConnectionManager, Depends(get_connection_manager)],
 ):
     await manager.connect(websocket, current_user.id)

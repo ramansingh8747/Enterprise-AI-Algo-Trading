@@ -7,6 +7,9 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.services.event_bus.interfaces import EventSubscriber
 from app.services.event_bus.models import Event
 from app.services.event_bus.bus import EventBus
+from app.database.session import SessionLocal
+from app.database.models.strategy import StrategyInstance
+from app.database.models.user import User, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +44,25 @@ class WebSocketConnectionManager:
         logger.info(f"WebSocket disconnected for user {user_id}")
 
     async def subscribe(self, websocket: WebSocket, user_id: UUID, topic: str):
-        # Basic authorization: check if topic is authorized for the user.
-        # Currently, all strategy:* topics are implicitly authorized if they belong to the user.
-        # Later, we will add repository-based ownership checks.
-        
+        # Strategy topic ownership authorization check
+        if "strategy:" in topic:
+            try:
+                parts = topic.split(":")
+                inst_id_str = parts[-1]
+                instance_id = UUID(inst_id_str)
+                with SessionLocal() as db:
+                    user = db.query(User).filter(User.id == user_id).first()
+                    is_admin = user and user.role == UserRole.ADMIN
+                    inst = db.query(StrategyInstance).filter(StrategyInstance.id == instance_id).first()
+                    if not inst or (not is_admin and inst.user_id != user_id):
+                        logger.warning("Unauthorized strategy subscription attempt: user=%s topic=%s", user_id, topic)
+                        await self.send_error(websocket, 403, "Forbidden: You do not own this strategy instance.")
+                        return
+            except (ValueError, TypeError) as e:
+                logger.warning("Invalid strategy topic format: %s (%s)", topic, e)
+                await self.send_error(websocket, 400, "Bad Request: Invalid strategy topic format.")
+                return
+
         async with self._lock:
             if websocket in self.subscribers:
                 # Already subscribed. In a real system, you might handle topic-level subscription.

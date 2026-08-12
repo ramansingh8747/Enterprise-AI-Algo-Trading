@@ -11,11 +11,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.dependencies.database import get_db
-from app.dependencies.auth import get_current_active_user
-from app.database.models.user import User
+from app.dependencies.auth import get_current_active_user, RoleChecker
+from app.database.models.user import User, UserRole
 from app.database.repositories.trading_risk_repository import TradingRiskRepository
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(RoleChecker([UserRole.ADMIN]))],
+)
 
 
 def get_risk_repository(db: Annotated[Session, Depends(get_db)]) -> TradingRiskRepository:

@@ -1,6 +1,6 @@
 from typing import Annotated, List
 
-from fastapi import Depends
+from fastapi import Depends, WebSocket
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -69,6 +69,36 @@ def get_current_user(
         raise UnauthorizedException()
 
     return service.get_current_user(credentials.credentials)
+
+
+def get_current_user_ws(
+    websocket: WebSocket,
+    service: Annotated[AuthenticationService, Depends(get_authentication_service)],
+) -> UserResponse:
+    """
+    FastAPI dependency for WebSocket connection authentication.
+    Extracts token from query parameter ``token`` or ``Authorization`` header.
+    """
+    token = websocket.query_params.get("token")
+    if not token:
+        auth_header = websocket.headers.get("authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    if not token:
+        logger.warning("Unauthorized WebSocket access attempt — no token provided")
+        raise UnauthorizedException()
+
+    return service.get_current_user(token)
+
+
+def get_current_active_user_ws(
+    current_user: Annotated[UserResponse, Depends(get_current_user_ws)],
+) -> UserResponse:
+    """FastAPI dependency that enforces the authenticated WebSocket user is active."""
+    if not current_user.is_active:
+        raise InactiveUserException()
+    return current_user
 
 
 def get_current_active_user(
