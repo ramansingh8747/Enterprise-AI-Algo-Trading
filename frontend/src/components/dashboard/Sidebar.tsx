@@ -1,6 +1,7 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ROUTES } from "@/constants/routes";
+import { useAuth } from "@/context/AuthContext";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -15,6 +16,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   const items = [
     {
@@ -52,6 +54,11 @@ export default function Sidebar({
       icon: "♙",
       path: ROUTES.BROKERS,
     },
+    ...(user?.role === 'ADMIN' ? [{
+      label: "Admin Console",
+      icon: "⚙",
+      path: ROUTES.KILL_SWITCH,
+    }] : []),
   ];
 
   const isActive = (path: string) => {

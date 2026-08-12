@@ -12,6 +12,8 @@ const StrategyPage = lazy(() => import('@/pages/strategy/StrategyPage'));
 const JournalPage = lazy(() => import('@/pages/journal/TradingJournalPage'));
 const BrokersPage = lazy(() => import('@/pages/brokers/BrokersPage'));
 const KillSwitchPage = lazy(() => import('@/pages/admin/KillSwitchPage'));
+const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'));
+const UnauthorizedPage = lazy(() => import('@/pages/errors/Unauthorized'));
 const HomePage = lazy(() => import('@/pages/home/HomePage'));
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
@@ -34,6 +36,10 @@ export const routes: RouteObject[] = [
     element: <RegisterPage />,
   },
   {
+    path: ROUTES.UNAUTHORIZED,
+    element: <UnauthorizedPage />,
+  },
+  {
     element: <ProtectedRoute />,
     children: [
       {
@@ -46,7 +52,13 @@ export const routes: RouteObject[] = [
           { path: ROUTES.STRATEGY, element: <StrategyPage /> },
           { path: ROUTES.JOURNAL, element: <JournalPage /> },
           { path: ROUTES.BROKERS, element: <BrokersPage /> },
-          { path: ROUTES.KILL_SWITCH, element: <KillSwitchPage /> },
+          {
+            element: <ProtectedRoute allowedRoles={['ADMIN']} />,
+            children: [
+              { path: ROUTES.ADMIN_DASHBOARD, element: <AdminDashboardPage /> },
+              { path: ROUTES.KILL_SWITCH, element: <KillSwitchPage /> },
+            ]
+          },
         ],
       },
     ],

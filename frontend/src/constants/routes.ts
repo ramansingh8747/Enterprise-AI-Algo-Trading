@@ -10,5 +10,7 @@ export const ROUTES = {
   JOURNAL: '/journal',
   BROKERS: '/brokers',
   KILL_SWITCH: '/admin/kill-switch',
+  ADMIN_DASHBOARD: '/admin',
+  UNAUTHORIZED: '/unauthorized',
   NOT_FOUND: '/404',
 };
