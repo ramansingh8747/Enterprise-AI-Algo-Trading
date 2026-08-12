@@ -1,6 +1,6 @@
 from typing import Annotated, List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Header, status
 
 from app.api.v1.routes.auth import get_current_active_user
 from app.schemas.auth import UserResponse
@@ -32,6 +32,7 @@ def place_order(
     payload: BrokerOrderCreateRequest,
     service: Annotated[BrokerOrderService, Depends(get_broker_order_service)],
     current_user: Annotated[UserResponse, Depends(get_current_active_user)],
+    x_idempotency_key: Annotated[Optional[str], Header(alias="X-Idempotency-Key")] = None,
 ) -> BrokerOrderResponse:
     """Place a new order through the specified broker account."""
     domain_request = payload.to_domain_request()
@@ -39,6 +40,7 @@ def place_order(
         user_id=current_user.id,
         broker_id=broker_id,
         request=domain_request,
+        idempotency_key=x_idempotency_key,
     )
     return BrokerOrderResponse.from_domain(order)
 

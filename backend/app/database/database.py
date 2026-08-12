@@ -11,6 +11,8 @@ def init_db() -> None:
     """
     if settings.DEBUG:
         logger.info("Initializing database tables (Development Mode)")
+        import app.database.models  # noqa: F401
         Base.metadata.create_all(bind=engine)
+
     else:
         logger.warning("Database initialization skipped. Use Alembic for production.")

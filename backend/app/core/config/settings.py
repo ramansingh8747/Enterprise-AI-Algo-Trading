@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     BROKER_SECRET_KEY: str
     PASSWORD_MIN_LENGTH: int = 8
+    CORS_ALLOWED_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 
     model_config = SettingsConfigDict(
         env_file=".env",

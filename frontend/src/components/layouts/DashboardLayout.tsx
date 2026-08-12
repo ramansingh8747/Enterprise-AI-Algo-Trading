@@ -1,21 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Outlet } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
-import { Navbar } from './Navbar';
-import '../../styles/layout.css';
+import AppShell from '@/components/layout/AppShell';
 
-export const DashboardLayout = () => {
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
-
+export const DashboardLayout: React.FC = () => {
   return (
-    <div className="dashboard-layout">
-      <Sidebar isOpen={isSidebarOpen} onToggle={() => setSidebarOpen(!isSidebarOpen)} />
-      <div className="main-content">
-        <Navbar />
-        <main>
-          <Outlet />
-        </main>
-      </div>
-    </div>
+    <AppShell>
+      <Outlet />
+    </AppShell>
   );
 };

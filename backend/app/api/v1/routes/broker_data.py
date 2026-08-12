@@ -1,11 +1,11 @@
 from typing import Annotated, List
 from uuid import UUID
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, Query
 
-from app.dependencies.broker_provider import get_broker_provider
+from app.dependencies.broker import get_broker_service
 from app.dependencies.auth import get_current_active_user
 from app.schemas.auth import UserResponse
-from app.brokers.interfaces.broker_interface import BrokerInterface
+from app.services.broker_service import BrokerService
 from app.schemas.broker_quote import BrokerQuoteResponse
 from app.brokers.base.broker_types import BrokerProfile, BrokerHolding, BrokerPosition, BrokerOrder
 
@@ -17,31 +17,41 @@ router = APIRouter(
 
 @router.get("/{broker_id}/profile", response_model=BrokerProfile)
 def get_broker_profile(
-    provider: Annotated[BrokerInterface, Depends(get_broker_provider)]
+    broker_id: UUID,
+    service: Annotated[BrokerService, Depends(get_broker_service)],
+    current_user: Annotated[UserResponse, Depends(get_current_active_user)],
 ):
-    return provider.get_profile()
+    return service.get_profile(current_user.id, broker_id)
 
 @router.get("/{broker_id}/holdings", response_model=List[BrokerHolding])
 def get_broker_holdings(
-    provider: Annotated[BrokerInterface, Depends(get_broker_provider)]
+    broker_id: UUID,
+    service: Annotated[BrokerService, Depends(get_broker_service)],
+    current_user: Annotated[UserResponse, Depends(get_current_active_user)],
 ):
-    return provider.get_holdings()
+    return service.get_holdings(current_user.id, broker_id)
 
 @router.get("/{broker_id}/positions", response_model=List[BrokerPosition])
 def get_broker_positions(
-    provider: Annotated[BrokerInterface, Depends(get_broker_provider)]
+    broker_id: UUID,
+    service: Annotated[BrokerService, Depends(get_broker_service)],
+    current_user: Annotated[UserResponse, Depends(get_current_active_user)],
 ):
-    return provider.get_positions()
+    return service.get_positions(current_user.id, broker_id)
 
 @router.get("/{broker_id}/orders", response_model=List[BrokerOrder])
 def get_broker_orders(
-    provider: Annotated[BrokerInterface, Depends(get_broker_provider)]
+    broker_id: UUID,
+    service: Annotated[BrokerService, Depends(get_broker_service)],
+    current_user: Annotated[UserResponse, Depends(get_current_active_user)],
 ):
-    return provider.get_orders()
+    return service.get_orders(current_user.id, broker_id)
 
 @router.get("/{broker_id}/quotes", response_model=List[BrokerQuoteResponse])
 def get_broker_quotes(
+    broker_id: UUID,
     symbols: Annotated[List[str], Query(...)],
-    provider: Annotated[BrokerInterface, Depends(get_broker_provider)]
+    service: Annotated[BrokerService, Depends(get_broker_service)],
+    current_user: Annotated[UserResponse, Depends(get_current_active_user)],
 ):
-    return provider.get_quotes(symbols)
+    return service.get_quotes(current_user.id, broker_id, symbols)

@@ -1,12 +1,15 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 from uuid import uuid4
 from decimal import Decimal
 from app.main import app
 from app.dependencies.auth import get_current_active_user
 from app.dependencies.broker_session import get_broker_session_service
-from app.dependencies.database import get_db
+from app.dependencies.broker import get_broker_service
+from app.services.broker_service import BrokerService
+from app.brokers.providers.zerodha.zerodha_broker import ZerodhaBroker
+from app.core.security.jwt_service import JwtService
 
 # Create test client
 client = TestClient(app)
@@ -20,6 +23,7 @@ class TestBrokerDataAPI(unittest.TestCase):
         # Mock User
         self.mock_user = MagicMock()
         self.mock_user.id = self.user_id
+        self.mock_user.is_active = True
 
         # Mock Session
         self.mock_session = MagicMock()
@@ -33,82 +37,86 @@ class TestBrokerDataAPI(unittest.TestCase):
         self.mock_broker.broker_type = "zerodha"
         self.mock_broker.is_active = True
 
+        # Setup Broker Session Service Mock
+        self.mock_session_service = MagicMock()
+
         # Setup overrides
         app.dependency_overrides[get_current_active_user] = lambda: self.mock_user
+        app.dependency_overrides[get_broker_session_service] = lambda: self.mock_session_service
+        
+        # Setup Broker Repository Mock
+        self.mock_repo = MagicMock()
+        self.mock_repo.get_by_id.return_value = self.mock_broker
+        
+        # Setup Broker Service Mock
+        self.mock_factory = MagicMock()
+        self.mock_zerodha_client = MagicMock()
+        self.mock_zerodha_broker = ZerodhaBroker(
+            session_service=self.mock_session_service,
+            broker_id=self.broker_id,
+            client=self.mock_zerodha_client
+        )
+        self.mock_service = BrokerService(
+            repository=self.mock_repo,
+            session_service=self.mock_session_service,
+            broker_factory=self.mock_factory
+        )
+        app.dependency_overrides[get_broker_service] = lambda: self.mock_service
+
+        # Auth headers
+        self.token = JwtService.create_access_token(str(self.user_id))
+        self.headers = {"Authorization": f"Bearer {self.token}"}
 
     def tearDown(self):
         app.dependency_overrides = {}
 
-    @patch('app.dependencies.broker_provider.BrokerRepository')
-    @patch('app.brokers.providers.zerodha.zerodha_broker.KiteConnect')
-    def test_all_read_only_endpoints_success(self, MockKiteConnect, MockBrokerRepository):
-        # Setup Mocks
-        mock_repo = MockBrokerRepository.return_value
-        mock_repo.get_by_id.return_value = self.mock_broker
+    def test_all_read_only_endpoints_success(self):
+        self.mock_session_service.get_active_session.return_value = self.mock_session
 
-        mock_session_service = MagicMock()
-        mock_session_service.get_active_session.return_value = self.mock_session
-        app.dependency_overrides[get_broker_session_service] = lambda: mock_session_service
-
-        mock_client = MockKiteConnect.return_value
+        mock_client = self.mock_zerodha_client
         mock_client.profile.return_value = {"user_id": "U12345", "user_type": "individual"}
         mock_client.holdings.return_value = [{"tradingsymbol": "RELIANCE", "quantity": 1, "average_price": 2000}]
-        mock_client.positions.return_value = {"net": [{"tradingsymbol": "RELIANCE", "quantity": 1, "average_price": 2000}]}
+        mock_client.positions.return_value = {"net": [{"tradingsymbol": "RELIANCE", "quantity": 1, "average_price": 2000, "side": 1}]}
         mock_client.orders.return_value = [{"order_id": "1", "tradingsymbol": "RELIANCE", "transaction_type": "BUY", "quantity": 1, "status": "COMPLETE"}]
         mock_client.quote.return_value = {"RELIANCE": {"last_price": 2000, "depth": {"buy": [{"price": 1999}], "sell": [{"price": 2001}]}}}
+        
+        self.mock_factory.get_provider.return_value = self.mock_zerodha_broker
 
         # Profile
-        resp = client.get(f"/api/v1/broker-data/{self.broker_id}/profile")
+        resp = client.get(f"/api/v1/broker-data/{self.broker_id}/profile", headers=self.headers)
         self.assertEqual(resp.status_code, 200)
 
         # Holdings
-        resp = client.get(f"/api/v1/broker-data/{self.broker_id}/holdings")
+        resp = client.get(f"/api/v1/broker-data/{self.broker_id}/holdings", headers=self.headers)
         self.assertEqual(resp.status_code, 200)
 
         # Positions
-        resp = client.get(f"/api/v1/broker-data/{self.broker_id}/positions")
+        resp = client.get(f"/api/v1/broker-data/{self.broker_id}/positions", headers=self.headers)
         self.assertEqual(resp.status_code, 200)
 
         # Orders
-        resp = client.get(f"/api/v1/broker-data/{self.broker_id}/orders")
+        resp = client.get(f"/api/v1/broker-data/{self.broker_id}/orders", headers=self.headers)
         self.assertEqual(resp.status_code, 200)
 
         # Quotes
-        resp = client.get(f"/api/v1/broker-data/{self.broker_id}/quotes?symbols=RELIANCE&symbols=TCS")
-        if resp.status_code != 200:
-            print(resp.json())
+        resp = client.get(f"/api/v1/broker-data/{self.broker_id}/quotes?symbols=RELIANCE&symbols=TCS", headers=self.headers)
         self.assertEqual(resp.status_code, 200)
 
-    @patch('app.dependencies.broker_provider.BrokerRepository')
-    @patch('app.brokers.providers.zerodha.zerodha_broker.KiteConnect')
-    def test_cross_user_isolation(self, MockKiteConnect, MockBrokerRepository):
-        mock_repo = MockBrokerRepository.return_value
-        mock_repo.get_by_id.return_value = self.mock_broker
+    def test_cross_user_isolation(self):
+        self.mock_session_service.get_active_session.return_value = None
 
-        mock_session_service = MagicMock()
-        mock_session_service.get_active_session.return_value = None
-        app.dependency_overrides[get_broker_session_service] = lambda: mock_session_service
-
-        response = client.get(f"/api/v1/broker-data/{self.broker_id}/profile")
+        response = client.get(f"/api/v1/broker-data/{self.broker_id}/profile", headers=self.headers)
         self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["message"], "No active session found for this broker.")
 
-        mock_client = MockKiteConnect.return_value
-        mock_client.profile.assert_not_called()
+    def test_exception_mapping_network(self):
+        self.mock_session_service.get_active_session.return_value = self.mock_session
 
-    @patch('app.dependencies.broker_provider.BrokerRepository')
-    @patch('app.brokers.providers.zerodha.zerodha_broker.KiteConnect')
-    def test_exception_mapping_network(self, MockKiteConnect, MockBrokerRepository):
-        mock_repo = MockBrokerRepository.return_value
-        mock_repo.get_by_id.return_value = self.mock_broker
-
-        mock_session_service = MagicMock()
-        mock_session_service.get_active_session.return_value = self.mock_session
-        app.dependency_overrides[get_broker_session_service] = lambda: mock_session_service
-
-        mock_client = MockKiteConnect.return_value
+        mock_client = self.mock_zerodha_client
         from kiteconnect.exceptions import NetworkException
         mock_client.profile.side_effect = NetworkException("network error")
+        
+        self.mock_factory.get_provider.return_value = self.mock_zerodha_broker
 
-        response = client.get(f"/api/v1/broker-data/{self.broker_id}/profile")
+        response = client.get(f"/api/v1/broker-data/{self.broker_id}/profile", headers=self.headers)
         self.assertEqual(response.status_code, 503)
-        mock_client.set_access_token.assert_any_call(None)

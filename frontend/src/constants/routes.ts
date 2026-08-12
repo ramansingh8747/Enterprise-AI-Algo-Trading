@@ -1,5 +1,14 @@
 export const ROUTES = {
   HOME: '/',
+  LOGIN: '/login',
+  REGISTER: '/register',
   DASHBOARD: '/dashboard',
+  ORDERS: '/orders',
+  PORTFOLIO: '/portfolio',
+  WATCHLIST: '/watchlist',
+  STRATEGY: '/strategy',
+  JOURNAL: '/journal',
+  BROKERS: '/brokers',
+  KILL_SWITCH: '/admin/kill-switch',
   NOT_FOUND: '/404',
 };

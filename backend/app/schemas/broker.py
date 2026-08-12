@@ -24,7 +24,7 @@ class BrokerUpdate(BaseModel):
     is_active: bool | None = None
 
 class BrokerResponse(BrokerBase):
-    """Schema for returning broker data."""
+    """Schema for returning broker data — credentials are intentionally excluded."""
     model_config = ConfigDict(from_attributes=True)
     id: UUID
-    api_key: str = Field(..., description="API Key")
+

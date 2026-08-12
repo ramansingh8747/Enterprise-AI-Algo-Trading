@@ -27,16 +27,24 @@ def override_get_db():
         db.close()
 
 
-app.dependency_overrides[get_db] = override_get_db
+from app.main import app as fastapi_app
 
-client = TestClient(app)
+client = TestClient(fastapi_app)
 
 
 @pytest.fixture(autouse=True)
 def setup_db():
+    fastapi_app.dependency_overrides[get_db] = override_get_db
+    import app.database.models  # noqa: F401
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+    fastapi_app.dependency_overrides.pop(get_db, None)
+
+
+
+
+
 
 
 def test_health_check():
@@ -46,9 +54,13 @@ def test_health_check():
 
 
 def test_register_user_success():
+    import uuid
+    uid = uuid.uuid4().hex[:6]
+    email = f"trader_{uid}@example.com"
+    username = f"trader_{uid}"
     payload = {
-        "email": "trader@example.com",
-        "username": "trader1",
+        "email": email,
+        "username": username,
         "full_name": "Pro Trader",
         "password": "Password123",
         "role": "TRADER"
@@ -57,9 +69,10 @@ def test_register_user_success():
     assert response.status_code == 201
     res_data = response.json()
     assert res_data["success"] is True
-    assert res_data["data"]["email"] == "trader@example.com"
-    assert res_data["data"]["username"] == "trader1"
+    assert res_data["data"]["email"] == email
+    assert res_data["data"]["username"] == username
     assert res_data["data"]["role"] == "TRADER"
+
     assert "password_hash" not in res_data["data"]
 
 
