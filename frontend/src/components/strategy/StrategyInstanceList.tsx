@@ -18,10 +18,11 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
   const loadInstances = React.useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await strategyApi.listInstances(strategyDefinitionId);
       setInstances(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load strategy instances');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load strategy instances');
     } finally {
       setLoading(false);
     }
@@ -35,13 +36,15 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
     setActionLoading(instanceId);
     setError(null);
     try {
-      if (action === 'start') await strategyApi.startInstance(strategyDefinitionId, instanceId);
-      else if (action === 'pause') await strategyApi.pauseInstance(strategyDefinitionId, instanceId);
-      else if (action === 'stop') await strategyApi.stopInstance(strategyDefinitionId, instanceId);
-      else if (action === 'resume') await strategyApi.resumeInstance(strategyDefinitionId, instanceId);
-      await loadInstances();
-    } catch (err) {
-      setError(`Failed to ${action} instance`);
+      let updated: StrategyInstance;
+      if (action === 'start') updated = await strategyApi.startInstance(strategyDefinitionId, instanceId);
+      else if (action === 'pause') updated = await strategyApi.pauseInstance(strategyDefinitionId, instanceId);
+      else if (action === 'stop') updated = await strategyApi.stopInstance(strategyDefinitionId, instanceId);
+      else updated = await strategyApi.resumeInstance(strategyDefinitionId, instanceId);
+
+      setInstances((current) => current.map((instance) => instance.id === updated.id ? updated : instance));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : `Failed to ${action} instance`);
     } finally {
       setActionLoading(null);
     }
@@ -76,7 +79,7 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
                   <td>
                     {actionLoading === inst.id ? <Spinner /> : (
                       <>
-                        {['READY', 'DRAFT'].includes(inst.status) && <button onClick={() => handleAction('start', inst.id)}>Start</button>}
+                        {['DRAFT', 'READY'].includes(inst.status) && <button onClick={() => handleAction('start', inst.id)}>Start</button>}
                         {inst.status === 'RUNNING' && <button onClick={() => handleAction('pause', inst.id)}>Pause</button>}
                         {inst.status === 'PAUSED' && <button onClick={() => handleAction('resume', inst.id)}>Resume</button>}
                         {['RUNNING', 'PAUSED', 'READY'].includes(inst.status) && <button onClick={() => handleAction('stop', inst.id)}>Stop</button>}
@@ -85,7 +88,7 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
                   </td>
                   <td>
                     <button onClick={() => setSelectedInstanceId(inst.id === selectedInstanceId ? null : inst.id)}>
-                        {inst.id === selectedInstanceId ? 'Hide' : 'View'}
+                      {inst.id === selectedInstanceId ? 'Hide' : 'View'}
                     </button>
                   </td>
                 </tr>
