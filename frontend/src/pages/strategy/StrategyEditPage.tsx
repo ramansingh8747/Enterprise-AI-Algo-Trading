@@ -10,7 +10,7 @@ import '../styles/StrategyEdit.css';
 /**
  * Strategy Edit Page
  *
- * Loads existing strategy definition and allows editing.
+ * Loads an existing strategy definition and allows editing.
  */
 export default function StrategyEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,9 +24,6 @@ export default function StrategyEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  /**
-   * Load existing strategy data
-   */
   useEffect(() => {
     if (!id) {
       setError('Strategy ID is missing');
@@ -42,8 +39,9 @@ export default function StrategyEditPage() {
         setStrategy(data);
         setName(data.name);
         setConfigJson(data.config_json || '');
-      } catch (err: any) {
-        setError(err.message || 'Failed to load strategy');
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to load strategy';
+        setError(message);
         console.error('Failed to load strategy:', err);
       } finally {
         setLoading(false);
@@ -55,9 +53,19 @@ export default function StrategyEditPage() {
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
+    const trimmedName = name.trim();
+    const trimmedConfig = configJson.trim();
 
-    if (!name.trim()) {
+    if (!trimmedName) {
       errors.name = 'Strategy name is required';
+    }
+
+    if (trimmedConfig) {
+      try {
+        JSON.parse(trimmedConfig);
+      } catch {
+        errors.configJson = 'Configuration must contain valid JSON';
+      }
     }
 
     setFieldErrors(errors);
@@ -80,9 +88,9 @@ export default function StrategyEditPage() {
         config_json: configJson.trim() || undefined,
       };
 
-      await strategyApi.updateDefinition(id, payload as any);
+      await strategyApi.updateDefinition(id, payload);
       navigate(`/strategies/${id}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError) {
         setError(err.message);
         if (err.details && typeof err.details === 'object') {
@@ -154,7 +162,11 @@ export default function StrategyEditPage() {
             onChange={(e) => setConfigJson(e.target.value)}
             disabled={saving}
             rows={8}
+            className={fieldErrors.configJson ? 'error' : ''}
           />
+          {fieldErrors.configJson && (
+            <span className="field-error">{fieldErrors.configJson}</span>
+          )}
         </div>
 
         <div className="form-actions">
