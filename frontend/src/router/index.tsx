@@ -12,6 +12,7 @@ const StrategyPage = lazy(() => import('@/pages/strategy/StrategyPage'));
 const StrategyManagementPage = lazy(() => import('@/pages/strategy/StrategyManagementPage'));
 const StrategyCreatePage = lazy(() => import('@/pages/strategy/StrategyCreatePage'));
 const StrategyDetailsPage = lazy(() => import('@/pages/strategy/StrategyDetailsPage'));
+const StrategyEditPage = lazy(() => import('@/pages/strategy/StrategyEditPage'));
 const JournalPage = lazy(() => import('@/pages/journal/TradingJournalPage'));
 const BrokersPage = lazy(() => import('@/pages/brokers/BrokersPage'));
 const KillSwitchPage = lazy(() => import('@/pages/admin/KillSwitchPage'));
@@ -55,6 +56,7 @@ export const routes: RouteObject[] = [
           { path: ROUTES.STRATEGY, element: <StrategyPage /> },
           { path: '/strategies', element: <StrategyManagementPage /> },
           { path: '/strategies/new', element: <StrategyCreatePage /> },
+          { path: '/strategies/:id/edit', element: <StrategyEditPage /> },
           { path: '/strategies/:id', element: <StrategyDetailsPage /> },
           { path: ROUTES.JOURNAL, element: <JournalPage /> },
           { path: ROUTES.BROKERS, element: <BrokersPage /> },
