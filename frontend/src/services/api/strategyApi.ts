@@ -33,96 +33,99 @@ export interface Signal {
   side: 'BUY' | 'SELL';
   quantity: string;
   order_type: string;
-  price: string;
+  price: string | null;
   signal_fingerprint: string;
   status: string;
   created_at: string;
 }
 
+export interface StrategyDefinitionCreateRequest {
+  name: string;
+  strategy_type?: string;
+  config_json?: string;
+}
+
+export interface StrategyDefinitionUpdateRequest {
+  name?: string;
+  strategy_type?: string;
+  config_json?: string;
+  is_active?: boolean;
+}
+
+export interface StrategyInstanceCreateRequest {
+  broker_id: string;
+  execution_mode?: 'PAPER' | 'LIVE';
+}
+
 export class StrategyApi extends BaseApi {
-  // --- Definitions ---
   async listDefinitions(): Promise<StrategyDefinition[]> {
-    return this.handleRequest<StrategyDefinition[]>(
-      this.http.get('/strategies'),
-      true
-    );
+    return this.handleRequest<StrategyDefinition[]>(this.http.get('/strategies'), true);
   }
 
-  async createDefinition(data: Omit<StrategyDefinition, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<StrategyDefinition> {
-    return this.handleRequest<StrategyDefinition>(
-      this.http.post('/strategies', data),
-      true
-    );
+  async createDefinition(data: StrategyDefinitionCreateRequest): Promise<StrategyDefinition> {
+    return this.handleRequest<StrategyDefinition>(this.http.post('/strategies', data), true);
   }
 
   async getDefinition(id: string): Promise<StrategyDefinition> {
-    return this.handleRequest<StrategyDefinition>(
-      this.http.get(`/strategies/${id}`),
-      true
-    );
+    return this.handleRequest<StrategyDefinition>(this.http.get(`/strategies/${id}`), true);
   }
 
-  async updateDefinition(id: string, data: Partial<Omit<StrategyDefinition, 'id' | 'user_id' | 'created_at' | 'updated_at'>>): Promise<StrategyDefinition> {
-    return this.handleRequest<StrategyDefinition>(
-      this.http.put(`/strategies/${id}`, data),
-      true
-    );
+  async updateDefinition(id: string, data: StrategyDefinitionUpdateRequest): Promise<StrategyDefinition> {
+    return this.handleRequest<StrategyDefinition>(this.http.put(`/strategies/${id}`, data), true);
   }
 
   async deleteDefinition(id: string): Promise<void> {
-    return this.handleRequest<void>(
-      this.http.delete(`/strategies/${id}`),
-      true
-    );
+    return this.handleRequest<void>(this.http.delete(`/strategies/${id}`), true);
   }
 
-  // --- Instances ---
-  async listInstances(defId: string): Promise<StrategyInstance[]> {
+  async listInstances(definitionId: string): Promise<StrategyInstance[]> {
     return this.handleRequest<StrategyInstance[]>(
-      this.http.get(`/strategies/${defId}/instances`),
+      this.http.get(`/strategies/${definitionId}/instances`),
       true
     );
   }
 
-  async createInstance(defId: string, data: { broker_id: string; execution_mode?: 'PAPER' | 'LIVE' }): Promise<StrategyInstance> {
+  async createInstance(
+    definitionId: string,
+    data: StrategyInstanceCreateRequest
+  ): Promise<StrategyInstance> {
     return this.handleRequest<StrategyInstance>(
-      this.http.post(`/strategies/${defId}/instances`, data),
+      this.http.post(`/strategies/${definitionId}/instances`, data),
       true
     );
   }
 
-  async startInstance(defId: string, instId: string): Promise<StrategyInstance> {
+  async startInstance(definitionId: string, instanceId: string): Promise<StrategyInstance> {
     return this.handleRequest<StrategyInstance>(
-      this.http.post(`/strategies/${defId}/instances/${instId}/start`, {}),
+      this.http.post(`/strategies/${definitionId}/instances/${instanceId}/start`, {}),
       true
     );
   }
 
-  async stopInstance(defId: string, instId: string): Promise<StrategyInstance> {
+  async stopInstance(definitionId: string, instanceId: string): Promise<StrategyInstance> {
     return this.handleRequest<StrategyInstance>(
-      this.http.post(`/strategies/${defId}/instances/${instId}/stop`, {}),
+      this.http.post(`/strategies/${definitionId}/instances/${instanceId}/stop`, {}),
       true
     );
   }
 
-  async pauseInstance(defId: string, instId: string): Promise<StrategyInstance> {
+  async pauseInstance(definitionId: string, instanceId: string): Promise<StrategyInstance> {
     return this.handleRequest<StrategyInstance>(
-      this.http.post(`/strategies/${defId}/instances/${instId}/pause`, {}),
+      this.http.post(`/strategies/${definitionId}/instances/${instanceId}/pause`, {}),
       true
     );
   }
 
-  async resumeInstance(defId: string, instId: string): Promise<StrategyInstance> {
+  async resumeInstance(definitionId: string, instanceId: string): Promise<StrategyInstance> {
     return this.handleRequest<StrategyInstance>(
-      this.http.post(`/strategies/${defId}/instances/${instId}/resume`, {}),
+      this.http.post(`/strategies/${definitionId}/instances/${instanceId}/resume`, {}),
       true
     );
   }
 
-  // --- Signals ---
-  async getSignalHistory(defId: string, instId: string): Promise<Signal[]> {
+  async getSignalHistory(definitionId: string, instanceId: string): Promise<Signal[]> {
     return this.handleRequest<Signal[]>(
-      this.http.get(`/strategies/${defId}/instances/${instId}/signals`),
+      this.http.get(`/strategies/${definitionId}/instances/${instanceId}/signals`),
       true
     );
   }
