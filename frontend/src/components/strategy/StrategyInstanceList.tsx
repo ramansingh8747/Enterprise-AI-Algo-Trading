@@ -2,11 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { strategyApi } from '@/services/api/strategyApi';
 import { StrategyInstance } from '@/types/strategy';
 import { Spinner } from '@/components/common/Spinner';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { SignalHistory } from './SignalHistory';
 
 interface Props {
   strategyDefinitionId: string;
 }
+
+type PendingAction = {
+  action: 'start';
+  instanceId: string;
+  title: string;
+  message: string;
+} | null;
 
 export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) => {
   const [instances, setInstances] = useState<StrategyInstance[]>([]);
@@ -14,6 +22,7 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
 
   const loadInstances = React.useCallback(async () => {
     try {
@@ -33,6 +42,23 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
   }, [loadInstances]);
 
   async function handleAction(action: 'start' | 'pause' | 'stop' | 'resume', instanceId: string) {
+    const instance = instances.find((item) => item.id === instanceId);
+
+    if (action === 'start' && instance?.execution_mode === 'LIVE') {
+      setPendingAction({
+        action: 'start',
+        instanceId,
+        title: '⚠️ Start Live Strategy',
+        message:
+          'This strategy instance is configured for LIVE execution. Starting it may place real broker orders. Confirm that you intentionally want to begin live trading.',
+      });
+      return;
+    }
+
+    await executeAction(action, instanceId);
+  }
+
+  async function executeAction(action: 'start' | 'pause' | 'stop' | 'resume', instanceId: string) {
     setActionLoading(instanceId);
     setError(null);
     try {
@@ -43,6 +69,7 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
       else updated = await strategyApi.resumeInstance(strategyDefinitionId, instanceId);
 
       setInstances((current) => current.map((instance) => instance.id === updated.id ? updated : instance));
+      setPendingAction(null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : `Failed to ${action} instance`);
     } finally {
@@ -79,7 +106,11 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
                   <td>
                     {actionLoading === inst.id ? <Spinner /> : (
                       <>
-                        {['DRAFT', 'READY'].includes(inst.status) && <button onClick={() => handleAction('start', inst.id)}>Start</button>}
+                        {['DRAFT', 'READY'].includes(inst.status) && (
+                          <button onClick={() => handleAction('start', inst.id)}>
+                            {inst.execution_mode === 'LIVE' ? 'Start LIVE' : 'Start'}
+                          </button>
+                        )}
                         {inst.status === 'RUNNING' && <button onClick={() => handleAction('pause', inst.id)}>Pause</button>}
                         {inst.status === 'PAUSED' && <button onClick={() => handleAction('resume', inst.id)}>Resume</button>}
                         {['RUNNING', 'PAUSED', 'READY'].includes(inst.status) && <button onClick={() => handleAction('stop', inst.id)}>Stop</button>}
@@ -97,6 +128,18 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
           </table>
           {selectedInstanceId && <SignalHistory strategyDefinitionId={strategyDefinitionId} instanceId={selectedInstanceId} />}
         </>
+      )}
+
+      {pendingAction && (
+        <ConfirmDialog
+          title={pendingAction.title}
+          message={pendingAction.message}
+          onConfirm={() => executeAction(pendingAction.action, pendingAction.instanceId)}
+          onCancel={() => setPendingAction(null)}
+          confirmText="Start LIVE"
+          cancelText="Cancel"
+          isDangerous
+        />
       )}
     </div>
   );
