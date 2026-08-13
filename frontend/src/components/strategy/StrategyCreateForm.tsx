@@ -9,16 +9,12 @@ interface StrategyCreateFormProps {
   onCancel?: () => void;
 }
 
-/**
- * Form for creating a new strategy definition.
- * Validates required fields and displays backend validation errors.
- */
 export const StrategyCreateForm: React.FC<StrategyCreateFormProps> = ({
   onSuccess,
   onCancel,
 }) => {
   const [name, setName] = useState('');
-  const [strategyType, setStrategyType] = useState('momentum');
+  const [strategyType, setStrategyType] = useState('DETERMINISTIC_MOMENTUM');
   const [configJson, setConfigJson] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,13 +22,24 @@ export const StrategyCreateForm: React.FC<StrategyCreateFormProps> = ({
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
+    const trimmedName = name.trim();
+    const trimmedStrategyType = strategyType.trim();
+    const trimmedConfig = configJson.trim();
 
-    if (!name.trim()) {
+    if (!trimmedName) {
       errors.name = 'Strategy name is required';
     }
 
-    if (!strategyType.trim()) {
+    if (!trimmedStrategyType) {
       errors.strategyType = 'Strategy type is required';
+    }
+
+    if (trimmedConfig) {
+      try {
+        JSON.parse(trimmedConfig);
+      } catch {
+        errors.configJson = 'Configuration must contain valid JSON';
+      }
     }
 
     setFieldErrors(errors);
@@ -56,22 +63,17 @@ export const StrategyCreateForm: React.FC<StrategyCreateFormProps> = ({
         config_json: configJson.trim() || undefined,
       };
 
-      const result = await strategyApi.createDefinition(
-        payload as any
-      );
+      const result = await strategyApi.createDefinition(payload);
 
       setName('');
-      setStrategyType('momentum');
+      setStrategyType('DETERMINISTIC_MOMENTUM');
       setConfigJson('');
       setFieldErrors({});
 
-      if (onSuccess) {
-        onSuccess(result.id);
-      }
-    } catch (err: any) {
+      onSuccess?.(result.id);
+    } catch (err: unknown) {
       if (err instanceof ApiError) {
         setError(err.message);
-        // If error details contain field-level errors, display them
         if (err.details && typeof err.details === 'object') {
           setFieldErrors(err.details as Record<string, string>);
         }
@@ -87,7 +89,6 @@ export const StrategyCreateForm: React.FC<StrategyCreateFormProps> = ({
   return (
     <form className="strategy-form" onSubmit={handleSubmit}>
       <h2>Create New Strategy</h2>
-
       {error && <div className="form-error">{error}</div>}
 
       <div className="form-group">
@@ -113,6 +114,7 @@ export const StrategyCreateForm: React.FC<StrategyCreateFormProps> = ({
           disabled={loading}
           className={fieldErrors.strategyType ? 'error' : ''}
         >
+          <option value="DETERMINISTIC_MOMENTUM">Deterministic Momentum</option>
           <option value="momentum">Momentum</option>
           <option value="mean_reversion">Mean Reversion</option>
           <option value="arbitrage">Arbitrage</option>
@@ -133,7 +135,11 @@ export const StrategyCreateForm: React.FC<StrategyCreateFormProps> = ({
           placeholder='{"param1": "value1"}'
           disabled={loading}
           rows={6}
+          className={fieldErrors.configJson ? 'error' : ''}
         />
+        {fieldErrors.configJson && (
+          <span className="field-error">{fieldErrors.configJson}</span>
+        )}
       </div>
 
       <div className="form-actions">
@@ -141,12 +147,7 @@ export const StrategyCreateForm: React.FC<StrategyCreateFormProps> = ({
           {loading ? 'Creating...' : 'Create Strategy'}
         </button>
         {onCancel && (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            disabled={loading}
-            onClick={onCancel}
-          >
+          <button type="button" className="btn btn-secondary" disabled={loading} onClick={onCancel}>
             Cancel
           </button>
         )}
