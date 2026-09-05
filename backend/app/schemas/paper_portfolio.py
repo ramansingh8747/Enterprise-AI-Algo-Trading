@@ -18,6 +18,9 @@ class PaperPositionResponse(BaseModel):
     cost_basis: Decimal = Field(description="Cost basis using Decimal precision.")
     realized_pnl: Decimal = Field(description="Cumulative realized P&L using Decimal precision.")
     unrealized_pnl: Decimal = Field(description="Current unrealized P&L using Decimal precision.")
+    last_price: Optional[Decimal] = None
+    market_value: Decimal = Decimal("0.0000")
+    valuation_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -32,6 +35,8 @@ class PaperPortfolioResponse(BaseModel):
     strategy_instance_id: Optional[UUID] = None
     name: str
     execution_mode: str = "PAPER"
+    initial_balance: Optional[Decimal] = Decimal("0.0000")
+    cash_balance: Optional[Decimal] = Decimal("0.0000")
     created_at: datetime
     updated_at: datetime
 
@@ -48,6 +53,10 @@ class PaperPortfolioSummaryResponse(BaseModel):
     total_unrealized_pnl: Decimal = Field(description="Sum of all position unrealized P&L.")
     total_pnl: Decimal = Field(description="Total portfolio P&L (Realized + Unrealized).")
     position_count: int = Field(description="Total number of positions in portfolio.")
+    today_realized_pnl: Decimal = Field(default=Decimal("0.0000"), description="Realized P&L closed today (resets daily at 00:00 IST).")
+    today_unrealized_pnl: Decimal = Field(default=Decimal("0.0000"), description="Unrealized P&L for today's active positions.")
+    today_total_pnl: Decimal = Field(default=Decimal("0.0000"), description="Total P&L for today (Today Realized + Today Unrealized).")
+    today_trades_count: int = Field(default=0, description="Total executions completed today.")
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

@@ -88,21 +88,27 @@ export const StrategySignals: React.FC<StrategySignalsProps> = ({ signals, onTra
             <div>
               <button
                 type="button"
-                onClick={() => onTrade?.(topSignal, "BUY")}
+                onClick={() => onTrade?.(topSignal, topSignal.action === "SELL" ? "SELL" : "BUY")}
                 style={{
                   width: "100%",
                   padding: "0.65rem 1.25rem",
                   borderRadius: "0.5rem",
-                  background: "linear-gradient(135deg, #059669 0%, #16a34a 100%)",
+                  background: topSignal.action === "SELL" 
+                    ? "linear-gradient(135deg, #dc2626 0%, #ef4444 100%)" 
+                    : topSignal.action === "BUY"
+                    ? "linear-gradient(135deg, #059669 0%, #16a34a 100%)"
+                    : "linear-gradient(135deg, #d97706 0%, #f59e0b 100%)",
                   color: "#ffffff",
                   border: "none",
                   fontWeight: 800,
                   fontSize: "0.875rem",
                   cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+                  boxShadow: topSignal.action === "SELL" 
+                    ? "0 4px 12px rgba(239, 68, 68, 0.3)" 
+                    : "0 4px 12px rgba(16, 185, 129, 0.3)",
                 }}
               >
-                Paper BUY ({topSignal.symbol})
+                Paper {topSignal.action === "SELL" ? "SELL" : topSignal.action === "BUY" ? "BUY" : "ORDER"} ({topSignal.symbol})
               </button>
             </div>
           </div>

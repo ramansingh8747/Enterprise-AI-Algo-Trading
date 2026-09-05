@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StrategyInstance, strategyApi } from '@/services/api/strategyApi';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
-import '../styles/InstanceControls.css';
+import '../../styles/InstanceControls.css';
 
 interface InstanceLifecycleControlsProps {
   instance: StrategyInstance;
@@ -45,7 +45,7 @@ export const InstanceLifecycleControls: React.FC<InstanceLifecycleControlsProps>
       setConfirmAction({
         action: 'start',
         title: '⚠️ Live Mode Execution',
-        message: `This strategy will run in LIVE mode. Confirm that you want to start live execution for ${instance.execution_mode} mode.`,
+        message: `This strategy will run in LIVE mode. Confirm that you want to start it.`,
       });
       return;
     }
@@ -95,7 +95,7 @@ export const InstanceLifecycleControls: React.FC<InstanceLifecycleControlsProps>
   return (
     <div className="instance-controls">
       {isLive && (
-        <div className="mode-warning">⚠️ LIVE EXECUTION MODE - Real trading enabled</div>
+        <div className="mode-warning">⚠️ LIVE MODE - Real trading enabled</div>
       )}
       {isPaperTradingMode && (
         <div className="mode-info">📊 PAPER TRADING MODE - Simulation only</div>

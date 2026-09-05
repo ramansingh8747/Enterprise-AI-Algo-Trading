@@ -53,3 +53,38 @@ def test_get_kill_switch_status_admin_success():
         assert response.status_code == 200
     finally:
         app.dependency_overrides = {}
+
+
+def test_get_risk_settings_unauthenticated():
+    response = client.get("/api/v1/admin/risk/settings")
+    assert response.status_code == 401
+
+
+def test_update_risk_settings_unauthenticated():
+    response = client.put(
+        "/api/v1/admin/risk/settings",
+        json={
+            "max_order_quantity": 100,
+            "max_order_notional": 10000,
+            "max_position_quantity": 500,
+            "max_exposure_notional": 50000,
+            "max_orders_per_minute": 10,
+            "daily_loss_limit": 5000,
+            "max_drawdown_percent": 10,
+        },
+    )
+    assert response.status_code == 401
+
+
+def test_get_risk_settings_trader_forbidden():
+    trader_user = MagicMock()
+    trader_user.id = uuid.uuid4()
+    trader_user.role = UserRole.TRADER
+    trader_user.is_active = True
+
+    app.dependency_overrides[get_current_active_user] = lambda: trader_user
+    try:
+        response = client.get("/api/v1/admin/risk/settings")
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides = {}

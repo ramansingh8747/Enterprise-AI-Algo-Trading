@@ -33,3 +33,11 @@ class InvalidLifecycleTransitionException(BaseStrategyException):
 
     def __init__(self, message: str, details: Optional[Any] = None) -> None:
         super().__init__(message=message, status_code=400, details=details)
+
+
+class ExecutionPolicyViolationException(BaseStrategyException):
+    """Raised when an execution violates the Semi-Automatic / Human-in-the-Loop policy."""
+
+    def __init__(self, message: str, details: Optional[Any] = None) -> None:
+        super().__init__(message=message, status_code=403, details=details)
+

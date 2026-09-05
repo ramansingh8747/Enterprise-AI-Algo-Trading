@@ -44,3 +44,10 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Legacy class compatibility for the strategy card component. */
+.strategy-management { color: #e5eefb; }
+.strategy-management-header { display: flex; justify-content: space-between; gap: 20px; align-items: center; margin-bottom: 18px; }
+.strategy-management-title h1 { margin: 0; color: #f8fafc; }
+.strategy-management-title p { color: #94a3b8; }
+@media (max-width: 760px) { .strategy-management-header { flex-direction: column; align-items: flex-start; } }

@@ -3,6 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { brokersApi, BrokerResponse, BrokerRequest } from "@/services/api/brokersApi";
 import { BrokerSessionCard } from "@/components/brokers/BrokerSessionCard";
 import { BrokerDataPanel } from "@/components/brokers/BrokerDataPanel";
+import { getMarketSessionStatus } from "@/utils/marketTiming";
 
 export default function BrokersPage() {
   const { user } = useAuth();
@@ -60,6 +61,13 @@ export default function BrokersPage() {
   useEffect(() => {
     if (isAdmin) {
       fetchBrokers();
+      const interval = setInterval(() => {
+        const session = getMarketSessionStatus();
+        if (session.isOpen || session.canExit) {
+          fetchBrokers();
+        }
+      }, 5000);
+      return () => clearInterval(interval);
     } else {
       setLoading(false);
     }
@@ -213,7 +221,7 @@ export default function BrokersPage() {
         </div>
       )}
 
-      <main style={{ maxWidth: "1400px", margin: "0 auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.75rem" }}>
+      <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "clamp(0.5rem, 2vw, 1.5rem)", display: "flex", flexDirection: "column", gap: "1.75rem" }}>
         {/* Header & Controls */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
           <div>
@@ -377,7 +385,7 @@ export default function BrokersPage() {
                 </button>
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: "1.5rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: "1.5rem" }}>
                 {brokers.map((broker) => (
                   <div
                     key={broker.id}
@@ -528,7 +536,7 @@ export default function BrokersPage() {
             )}
           </section>
         )}
-      </main>
+      </div>
 
       {/* Modal: Create / Edit Broker */}
       {(modalMode === 'create' || modalMode === 'edit') && (

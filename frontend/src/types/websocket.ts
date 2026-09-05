@@ -15,13 +15,14 @@ export interface WebSocketEvent<T = Record<string, unknown>> {
   event_id: string;
   event_type: string;
   timestamp: string;
-  user_id: string;
+  user_id?: string | null;
   broker_id?: string;
   strategy_id?: string;
   strategy_instance_id?: string;
   symbol?: string;
   execution_mode?: string;
   payload: T;
+  topic?: string;
 }
 
 export interface WebSocketErrorEvent {
@@ -54,6 +55,6 @@ export function isValidWebSocketEvent(value: unknown): value is WebSocketEvent {
     typeof event.event_id === "string" &&
     typeof event.event_type === "string" &&
     typeof event.timestamp === "string" &&
-    typeof event.user_id === "string"
+    (event.user_id === undefined || event.user_id === null || typeof event.user_id === "string")
   );
 }

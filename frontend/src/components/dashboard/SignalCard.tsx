@@ -62,7 +62,7 @@ export const SignalCard: React.FC<SignalCardProps> = ({ signal, onTrade, onDetai
           background: actionStyle.bg,
           border: `1px solid ${actionStyle.border}`,
         }}>
-          {signal.action}
+          {signal.action} ({signal.strength}%)
         </span>
       </div>
 

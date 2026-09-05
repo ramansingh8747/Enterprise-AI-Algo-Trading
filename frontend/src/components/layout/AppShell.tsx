@@ -9,14 +9,26 @@ interface AppShellProps {
 export default function AppShell({
   children,
 }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const toggleSidebar = () => {
     if (window.innerWidth <= 900) {
       setMobileOpen((value) => !value);
     } else {
-      setCollapsed((value) => !value);
+      setCollapsed((value) => {
+        const next = !value;
+        try {
+          localStorage.setItem("sidebar_collapsed", String(next));
+        } catch {}
+        return next;
+      });
     }
   };
 
@@ -26,9 +38,10 @@ export default function AppShell({
         minHeight: "100vh",
         width: "100%",
         display: "flex",
-        background: "linear-gradient(180deg,#020617 0%,#07111f 100%)",
+        background: "radial-gradient(ellipse at 15% 0%, rgba(14, 165, 233, 0.09) 0%, transparent 55%), radial-gradient(ellipse at 85% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 50%), #020617",
         color: "#f8fafc",
         overflowX: "hidden",
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       }}
     >
       {mobileOpen && (
@@ -37,8 +50,9 @@ export default function AppShell({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,.65)",
-            zIndex: 90,
+            background: "rgba(2, 6, 23, 0.8)",
+            backdropFilter: "blur(4px)",
+            zIndex: 140,
           }}
         />
       )}
@@ -47,6 +61,7 @@ export default function AppShell({
         collapsed={collapsed}
         mobileOpen={mobileOpen}
         onToggle={toggleSidebar}
+        onCloseMobile={() => setMobileOpen(false)}
       />
 
       <div
@@ -62,18 +77,11 @@ export default function AppShell({
           onSidebarToggle={toggleSidebar}
         />
 
-        <main
-          style={{
-            flex: 1,
-            width: "100%",
-            padding: "26px",
-            boxSizing: "border-box",
-          }}
-        >
+        <main className="app-main-content">
           <div
             style={{
               width: "100%",
-              maxWidth: "1500px",
+              maxWidth: "1540px",
               margin: "0 auto",
             }}
           >
@@ -81,29 +89,21 @@ export default function AppShell({
           </div>
         </main>
 
-        <footer
-          style={{
-            padding: "18px 26px",
-            borderTop: "1px solid rgba(148,163,184,.10)",
-            color: "#64748b",
-            fontSize: 11,
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 16,
-            flexWrap: "wrap",
-          }}
-        >
-          <span>
-            © 2026 AntigravityAlgo. All rights reserved.
-          </span>
+        <footer className="app-footer">
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontWeight: 700, color: "#94a3b8" }}>
+              ⚡ AntigravityAlgo Enterprise Quant
+            </span>
+            <span>•</span>
+            <span>v2.5.0 Production Ready</span>
+          </div>
 
-          <span
-            style={{
-              color: "#fbbf24",
-            }}
-          >
-            Paper trading only. Real trading disabled.
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
+            <span style={{ color: "#a7f3d0", fontWeight: 600 }}>
+              Paper Trading Active • Real Money Trading Gated
+            </span>
+          </div>
         </footer>
       </div>
     </div>

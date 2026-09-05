@@ -44,6 +44,7 @@ describe('Phase 14 — Frontend Authentication & User Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   // 1. Login success
@@ -78,9 +79,9 @@ describe('Phase 14 — Frontend Authentication & User Integration', () => {
     });
 
     expect(screen.getByTestId('user-email').textContent).toBe('trader@enterprise.com');
-    expect(localStorage.getItem('access_token')).toBe('valid_access_token');
-    expect(localStorage.getItem('refresh_token')).toBe('valid_refresh_token');
-    expect(JSON.parse(localStorage.getItem('user_profile') || '{}')).toEqual(mockUser);
+    expect(localStorage.getItem('trader_access_token')).toBe('valid_access_token');
+    expect(localStorage.getItem('trader_refresh_token')).toBe('valid_refresh_token');
+    expect(JSON.parse(localStorage.getItem('trader_user_profile') || '{}')).toEqual(mockUser);
   });
 
   // 2. Login failure
@@ -155,7 +156,7 @@ describe('Phase 14 — Frontend Authentication & User Integration', () => {
       expect(screen.getByText('Registration successful! You can now sign in.')).toBeDefined();
     });
 
-    expect(localStorage.getItem('access_token')).toBeNull();
+    expect(localStorage.getItem('trader_access_token')).toBeNull();
   });
 
   // 4. Registration validation failure
@@ -199,8 +200,8 @@ describe('Phase 14 — Frontend Authentication & User Integration', () => {
 
   // 5. AuthContext restores authenticated user
   it('5. AuthContext restores user via authApi.getMe on session startup', async () => {
-    localStorage.setItem('access_token', 'stored_access_token');
-    localStorage.setItem('user_profile', JSON.stringify(mockUser));
+    localStorage.setItem('trader_access_token', 'stored_access_token');
+    localStorage.setItem('trader_user_profile', JSON.stringify(mockUser));
 
     (axiosInstance.get as any).mockResolvedValueOnce({
       data: { success: true, message: 'User profile retrieved', data: mockUser },
@@ -232,8 +233,8 @@ describe('Phase 14 — Frontend Authentication & User Integration', () => {
 
   // 6. AuthContext handles invalid session
   it('6. AuthContext handles invalid session by clearing tokens', async () => {
-    localStorage.setItem('access_token', 'expired_access_token');
-    localStorage.setItem('user_profile', JSON.stringify(mockUser));
+    localStorage.setItem('trader_access_token', 'expired_access_token');
+    localStorage.setItem('trader_user_profile', JSON.stringify(mockUser));
 
     (axiosInstance.get as any).mockRejectedValueOnce({
       response: {
@@ -258,8 +259,8 @@ describe('Phase 14 — Frontend Authentication & User Integration', () => {
       expect(screen.getByTestId('status').textContent).toBe('ANONYMOUS');
     });
 
-    expect(localStorage.getItem('access_token')).toBeNull();
-    expect(localStorage.getItem('user_profile')).toBeNull();
+    expect(localStorage.getItem('trader_access_token')).toBeNull();
+    expect(localStorage.getItem('trader_user_profile')).toBeNull();
   });
 
   // 7. Protected route redirects unauthenticated user
@@ -284,7 +285,7 @@ describe('Phase 14 — Frontend Authentication & User Integration', () => {
 
   // 8. Protected route allows authenticated user
   it('8. Protected route allows authenticated user', async () => {
-    localStorage.setItem('access_token', 'valid_token');
+    localStorage.setItem('trader_access_token', 'valid_token');
     (axiosInstance.get as any).mockResolvedValueOnce({
       data: { success: true, message: 'User details', data: mockUser },
     });
@@ -309,8 +310,8 @@ describe('Phase 14 — Frontend Authentication & User Integration', () => {
 
   // 9. Logout clears authentication state
   it('9. Logout clears tokens and resets user state', async () => {
-    localStorage.setItem('access_token', 'token_to_clear');
-    localStorage.setItem('user_profile', JSON.stringify(mockUser));
+    localStorage.setItem('trader_access_token', 'token_to_clear');
+    localStorage.setItem('trader_user_profile', JSON.stringify(mockUser));
 
     (axiosInstance.get as any).mockResolvedValueOnce({
       data: { success: true, message: 'User profile retrieved', data: mockUser },
@@ -340,8 +341,8 @@ describe('Phase 14 — Frontend Authentication & User Integration', () => {
     fireEvent.click(screen.getByText('Sign Out'));
 
     expect(screen.getByTestId('status').textContent).toBe('LOGGED_OUT');
-    expect(localStorage.getItem('access_token')).toBeNull();
-    expect(localStorage.getItem('user_profile')).toBeNull();
+    expect(localStorage.getItem('trader_access_token')).toBeNull();
+    expect(localStorage.getItem('trader_user_profile')).toBeNull();
   });
 
   // 10. /users/me direct response (Type B) handling
@@ -386,7 +387,7 @@ describe('Phase 14 — Frontend Authentication & User Integration', () => {
       expect(screen.getByTestId('name').textContent).toBe('Updated Name');
     });
 
-    expect(JSON.parse(localStorage.getItem('user_profile') || '{}').full_name).toBe('Updated Name');
+    expect(JSON.parse(localStorage.getItem('trader_user_profile') || '{}').full_name).toBe('Updated Name');
   });
 
   // 12. Change password success & error

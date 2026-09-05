@@ -21,6 +21,7 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [paperRunMessage, setPaperRunMessage] = useState<string | null>(null);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
 
@@ -77,12 +78,34 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
     }
   }
 
+  async function handlePaperRun(instance: StrategyInstance) {
+    if (instance.execution_mode !== 'PAPER') return;
+
+    setActionLoading(instance.id);
+    setError(null);
+    setPaperRunMessage(null);
+    try {
+      const result = await strategyApi.runPaperCycle(strategyDefinitionId, instance.id);
+      setPaperRunMessage(
+        result.order_id
+          ? `PAPER cycle completed: ${result.order_id} (${result.order_status ?? 'COMPLETE'}).`
+          : 'PAPER cycle completed without a generated signal.'
+      );
+      await loadInstances();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to run PAPER strategy cycle');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   if (loading) return <Spinner />;
   if (error) return <div>{error} <button onClick={loadInstances}>Retry</button></div>;
 
   return (
     <div>
       <h3>Instances</h3>
+      {paperRunMessage && <div role="status" style={{ margin: '0.75rem 0' }}>{paperRunMessage}</div>}
       {instances.length === 0 ? (
         <p>No instances found.</p>
       ) : (
@@ -112,6 +135,9 @@ export const StrategyInstanceList: React.FC<Props> = ({ strategyDefinitionId }) 
                           </button>
                         )}
                         {inst.status === 'RUNNING' && <button onClick={() => handleAction('pause', inst.id)}>Pause</button>}
+                        {inst.status === 'RUNNING' && inst.execution_mode === 'PAPER' && (
+                          <button onClick={() => handlePaperRun(inst)}>Run PAPER Cycle</button>
+                        )}
                         {inst.status === 'PAUSED' && <button onClick={() => handleAction('resume', inst.id)}>Resume</button>}
                         {['RUNNING', 'PAUSED', 'READY'].includes(inst.status) && <button onClick={() => handleAction('stop', inst.id)}>Stop</button>}
                       </>

@@ -9,6 +9,8 @@ from app.database.models.user import User, UserRole
 from app.database.models.strategy import StrategyDefinition, StrategyInstance
 from app.database.repositories.paper_portfolio_repository import PaperPortfolioRepository
 from app.services.paper_accounting_service import PaperAccountingService
+from app.services.execution_position_service import ExecutionPositionService
+from app.database.repositories.trading_execution_repository import TradingExecutionRepository, TradingPositionRepository
 from app.exceptions.paper_accounting_exceptions import (
     InvalidExecutionModeException,
     InvalidPaperFillException,
@@ -318,3 +320,35 @@ def test_user_and_strategy_isolation(db_session, accounting_service):
     assert pos2.user_id == user2.id
     assert pos2.quantity == Decimal("50.0000")
     assert pos1.id != pos2.id
+
+
+def test_paper_fill_persists_execution_ledger_with_broker_mapping(db_session):
+    user = db_session.query(User).first()
+    broker_id = uuid.uuid4()
+    execution_service = ExecutionPositionService(
+        execution_repository=TradingExecutionRepository(db_session),
+        position_repository=TradingPositionRepository(db_session),
+    )
+    service = PaperAccountingService(
+        repository=PaperPortfolioRepository(db=db_session),
+        execution_position_service=execution_service,
+    )
+
+    service.record_fill(
+        user_id=user.id,
+        broker_id=broker_id,
+        symbol="INFY",
+        side="BUY",
+        quantity="2",
+        price="1500",
+        execution_mode="PAPER",
+        execution_id="PAPER-LEDGER-1",
+    )
+
+    execution = execution_service._executions.get_by_external_id(
+        "PAPER", broker_id, "PAPER-LEDGER-1"
+    )
+    assert execution is not None
+    assert execution.execution_mode == "PAPER"
+    assert execution.broker_id == broker_id
+    assert execution.quantity == Decimal("2.00000000")

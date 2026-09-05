@@ -31,6 +31,7 @@ def mock_risk_repo(mock_db_session):
         kill_switch_active=False,
     )
     repo.get_risk_settings.return_value = settings
+    repo.get_global_risk_settings.return_value = settings
     repo.count_recent_orders_in_window.return_value = 0
     return repo
 
@@ -170,3 +171,37 @@ def test_broker_order_service_uses_risk_engine_before_order_dispatch(risk_engine
 
     # Provider place_order MUST NOT be called when risk engine rejects
     mock_provider.place_order.assert_not_called()
+
+
+def test_global_kill_switch_overrides_scoped_settings(risk_engine, mock_risk_repo):
+    from types import SimpleNamespace
+    from decimal import Decimal
+    import uuid
+    from app.brokers.base.broker_types import BrokerOrderRequest
+    from app.exceptions.risk_exceptions import TradingHaltedException
+
+    scoped = SimpleNamespace(
+        kill_switch_active=False,
+        max_orders_per_minute=10,
+        max_order_quantity=Decimal("100"),
+        max_order_notional=Decimal("10000"),
+        max_position_quantity=Decimal("500"),
+        max_exposure_notional=Decimal("50000"),
+        daily_loss_limit=Decimal("5000"),
+    )
+    global_settings = SimpleNamespace(kill_switch_active=True)
+    mock_risk_repo.get_risk_settings.return_value = scoped
+    mock_risk_repo.get_global_risk_settings.return_value = global_settings
+
+    request = BrokerOrderRequest(
+        symbol="RELIANCE",
+        exchange="NSE",
+        variety="regular",
+        side="BUY",
+        quantity=1,
+        order_type="MARKET",
+        product="CNC",
+    )
+
+    with pytest.raises(TradingHaltedException):
+        risk_engine.validate_order(uuid.uuid4(), uuid.uuid4(), request)

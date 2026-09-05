@@ -1,0 +1,25 @@
+.admin-portfolio__summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; margin-bottom:18px; }
+.admin-portfolio__summary article { background:#111827; border:1px solid #243047; border-radius:14px; padding:16px; }
+.admin-portfolio__summary span,.admin-portfolio__summary small { display:block; color:#94a3b8; font-size:12px; }
+.admin-portfolio__summary strong { display:block; margin:8px 0 4px; color:#f8fafc; font-size:22px; }
+.admin-portfolio__filters { display:grid; grid-template-columns:minmax(220px,1fr) 180px auto; gap:12px; align-items:end; }
+.admin-portfolio__filters label { display:flex; flex-direction:column; gap:6px; color:#94a3b8; font-size:12px; }
+.admin-portfolio__filters input,.admin-portfolio__filters select { background:#0b1220; color:#e2e8f0; border:1px solid #334155; border-radius:8px; padding:10px; }
+.admin-portfolio__filter-actions { display:flex; gap:8px; }
+.admin-portfolio__filter-actions button,.admin-portfolio__details { border:0; border-radius:8px; padding:10px 14px; cursor:pointer; }
+.admin-portfolio__table-wrap { overflow:auto; }
+.admin-portfolio__table { width:100%; border-collapse:collapse; min-width:1250px; }
+.admin-portfolio__table th,.admin-portfolio__table td { padding:12px 10px; border-bottom:1px solid #1e293b; text-align:left; white-space:nowrap; }
+.admin-portfolio__table th { color:#94a3b8; font-size:11px; text-transform:uppercase; }
+.admin-portfolio__table td { color:#e2e8f0; font-size:13px; }
+.admin-portfolio__table td small { display:block; color:#64748b; margin-top:3px; }
+.admin-portfolio__mode { display:inline-block; padding:4px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+.admin-portfolio__mode.is-paper { background:#123524; color:#86efac; }
+.admin-portfolio__mode.is-live { background:#3b1d1d; color:#fca5a5; }
+.admin-portfolio__profit { color:#86efac !important; } .admin-portfolio__loss { color:#fca5a5 !important; }
+.admin-portfolio__ws { color:#94a3b8; font-size:12px; } .admin-portfolio__ws.is-good { color:#86efac; }
+.admin-portfolio__modal-backdrop { position:fixed; inset:0; background:rgba(2,6,23,.72); display:grid; place-items:center; z-index:50; padding:20px; }
+.admin-portfolio__modal { width:min(760px,100%); background:#0f172a; border:1px solid #334155; border-radius:16px; padding:22px; color:#e2e8f0; }
+.admin-portfolio__detail-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:18px; }
+.admin-portfolio__detail-grid div { background:#111827; border-radius:10px; padding:12px; } .admin-portfolio__detail-grid span { display:block;color:#94a3b8;font-size:11px; } .admin-portfolio__detail-grid strong { display:block;margin-top:5px; }
+@media (max-width: 1100px) { .admin-portfolio__summary{grid-template-columns:repeat(2,1fr)} .admin-portfolio__filters{grid-template-columns:1fr} .admin-portfolio__detail-grid{grid-template-columns:repeat(2,1fr)} }

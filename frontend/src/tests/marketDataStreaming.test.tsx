@@ -11,6 +11,7 @@ import { render, screen, act } from '@testing-library/react';
 import { WebSocketProvider } from '@/context/WebSocketProvider';
 import { LiveQuoteTicker } from '@/components/market/LiveQuoteTicker';
 import { AuthContext } from '@/context/AuthContext';
+import { setActiveSessionScope } from '@/services/auth/session';
 
 // ---------------------------------------------------------------------------
 // Mock WebSocket Implementation
@@ -102,13 +103,15 @@ describe('Frontend Market Data Streaming (Step 13.21I.34.119)', () => {
     MockWebSocket.instances = [];
     // @ts-expect-error Mocking global WebSocket
     global.WebSocket = MockWebSocket;
-    localStorage.setItem('access_token', 'test_jwt_token_123');
+    localStorage.setItem('trader_access_token', 'test_jwt_token_123');
+    setActiveSessionScope('trader');
   });
 
   afterEach(() => {
     vi.useRealTimers();
     global.WebSocket = originalWebSocket;
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   // Test 1: Subscribe to market:<symbol>

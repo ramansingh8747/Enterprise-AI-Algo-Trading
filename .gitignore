@@ -1,38 +1,39 @@
-# Python
+# Environment files (Secrets)
+.env
+*.env
+backend/.env
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+backend/*.db
+backend/trading_platform.db
+
+# Python & Virtual Environments
 __pycache__/
 *.py[cod]
-*.class
-
-# Virtual environments
+*$py.class
 .venv/
 venv/
-env/
+backend/.venv/
+backend/venv/
 
-# Environment files
-.env
-.env.*
-!.env.example
+# Node & Frontend Build
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.vite/
 
-# Test / coverage
-.pytest_cache/
-.coverage
-htmlcov/
-coverage.xml
+# Logs & Temporary storage
+logs/
+*.log
+backend/logs/
+backend/storage/
+backend/storage/*
+storage/
 
-# IDE
-.vscode/
-.idea/
-
-# OS
+# OS files
 .DS_Store
 Thumbs.db
-
-
-node_modules/
-*.db
-.env
-.venv/
-__pycache__/
-*.pyc
-dist/
-build/

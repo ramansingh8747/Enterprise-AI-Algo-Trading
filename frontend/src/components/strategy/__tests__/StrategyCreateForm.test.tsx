@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { StrategyCreateForm } from '@/components/strategy/StrategyCreateForm';
 import { strategyApi } from '@/services/api/strategyApi';
+import { ApiError } from '@/services/api/ApiError';
 
 vi.mock('@/services/api/strategyApi');
 
@@ -71,8 +72,7 @@ describe('StrategyCreateForm', () => {
   });
 
   it('displays backend validation errors', async () => {
-    const error = new Error('Invalid config');
-    error.details = { config_json: 'Invalid JSON format' };
+    const error = new ApiError('Invalid config', 422, { config_json: 'Invalid JSON format' });
     vi.mocked(strategyApi.createDefinition).mockRejectedValue(error);
 
     render(

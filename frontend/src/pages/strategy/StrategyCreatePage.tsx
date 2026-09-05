@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StrategyCreateForm } from '@/components/strategy/StrategyCreateForm';
-import '../styles/StrategyCreate.css';
+import './styles/StrategyCreate.css';
 
 /**
  * Strategy Creation Page

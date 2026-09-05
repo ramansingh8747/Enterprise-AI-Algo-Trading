@@ -10,6 +10,7 @@ export * from "./tradingJournalApi";
 export * from "./watchlistApi";
 export * from "./alertsApi";
 export * from "./searchApi";
+export * from "./frozenPaperTradingApi";
 
 
 

@@ -1,11 +1,2 @@
-.strategy-create-page {
-  padding: 2rem 1rem;
-  min-height: 100vh;
-  background: #f9fafb;
-}
-
-@media (max-width: 768px) {
-  .strategy-create-page {
-    padding: 1rem 0.5rem;
-  }
-}
+.strategy-create-page{min-height:100%;padding:28px 0;color:#e5eefb}.strategy-create-page .strategy-form{background:linear-gradient(180deg,#0f1a2d,#0b1424);border:1px solid rgba(148,163,184,.15);border-radius:18px;padding:28px;max-width:760px;margin:0 auto;box-shadow:0 18px 60px rgba(0,0,0,.2)}
+.strategy-create-page .strategy-form h2{color:#f8fafc;margin:0 0 22px;font-size:28px}.strategy-create-page .form-group{margin-bottom:18px}.strategy-create-page .form-group label{color:#cbd5e1}.strategy-create-page .form-group input,.strategy-create-page .form-group select,.strategy-create-page .form-group textarea{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid rgba(148,163,184,.22);border-radius:9px;background:#07111f;color:#e2e8f0}.strategy-create-page .form-group input:focus,.strategy-create-page .form-group select:focus,.strategy-create-page .form-group textarea:focus{outline:none;border-color:#38bdf8;box-shadow:0 0 0 3px rgba(56,189,248,.08)}.strategy-create-page .field-error{color:#fca5a5}.strategy-create-page .form-error{background:rgba(127,29,29,.2);border:1px solid rgba(248,113,113,.3);color:#fecaca}.strategy-create-page .form-actions{display:flex;gap:10px}.strategy-create-page .form-actions button{border:1px solid rgba(148,163,184,.22);border-radius:9px;padding:11px 16px}.strategy-create-page .btn-primary{background:#0284c7;color:#fff}.strategy-create-page .btn-secondary{background:#111c2f;color:#cbd5e1}@media(max-width:700px){.strategy-create-page{padding:16px 0}.strategy-create-page .strategy-form{padding:20px}.strategy-create-page .form-actions{flex-direction:column}}

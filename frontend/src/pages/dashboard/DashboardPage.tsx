@@ -40,21 +40,15 @@ import {
   calculateTradingStatistics, 
   calculatePerformanceHistory, 
 } from '@/services/paperTrading/paperAnalyticsService';
+import { getMarketSessionStatus } from '@/utils/marketTiming';
 import { brokerDataApi } from '@/services/api/brokerDataApi';
+import { paperPortfolioApi } from '@/services/api/paperPortfolioApi';
+import { paperOrdersApi } from '@/services/api/paperOrdersApi';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/constants/routes';
 import { BrokerProfile, BrokerHolding, BrokerPosition, BrokerOrder, BrokerQuote } from '@/types/brokerData';
-import { PaperHolding } from '@/types/paperPortfolio';
-import {
-  INITIAL_PAPER_BALANCE,
-  applyBuyOrder,
-  applySellOrder,
-  calculateAccountSummary,
-} from '@/services/paperTrading/paperPortfolioService';
-
-const PAPER_ORDERS_KEY = "algo_trading_paper_orders";
-const PAPER_HOLDINGS_KEY = "algo_trading_paper_holdings";
-const PAPER_BALANCE_KEY = "algo_trading_paper_balance";
+import { PaperHolding, PaperPosition } from '@/types/paperPortfolio';
+import { PortfolioValuation } from '@/types/portfolioValuation';
 
 export default function DashboardPage() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -67,35 +61,13 @@ export default function DashboardPage() {
   const [orders, setOrders] = useState<BrokerOrder[]>([]);
   const [quotes, setQuotes] = useState<BrokerQuote[]>([]);
 
-  // Paper Trading State
-  const [paperBalance, setPaperBalance] = useState<number>(() => {
-    try {
-      const stored = localStorage.getItem(PAPER_BALANCE_KEY);
-      return stored ? Number(stored) : INITIAL_PAPER_BALANCE;
-    } catch {
-      return INITIAL_PAPER_BALANCE;
-    }
-  });
-
-  const [paperHoldings, setPaperHoldings] = useState<PaperHolding[]>(() => {
-    try {
-      const stored = localStorage.getItem(PAPER_HOLDINGS_KEY);
-      const parsed = stored ? JSON.parse(stored) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [paperOrders, setPaperOrders] = useState<PaperOrder[]>(() => {
-    try {
-      const stored = localStorage.getItem(PAPER_ORDERS_KEY);
-      const parsed = stored ? JSON.parse(stored) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
+  // Server-managed PAPER trading state
+  const [selectedPaperPortfolioId, setSelectedPaperPortfolioId] = useState<string | null>(null);
+  const [paperPositions, setPaperPositions] = useState<PaperPosition[]>([]);
+  const [paperValuation, setPaperValuation] = useState<PortfolioValuation | null>(null);
+  const [paperOrders, setPaperOrders] = useState<PaperOrder[]>([]);
+  const [paperStateLoading, setPaperStateLoading] = useState<boolean>(false);
+  const [paperStateError, setPaperStateError] = useState<string | null>(null);
 
   const [, setSignalTrade] = useState<{ signal: TradingSignal; side: "BUY" | "SELL"; } | null>(null);
 
@@ -114,16 +86,50 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Persist Paper Trading State to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(PAPER_BALANCE_KEY, String(paperBalance));
-      localStorage.setItem(PAPER_HOLDINGS_KEY, JSON.stringify(paperHoldings));
-      localStorage.setItem(PAPER_ORDERS_KEY, JSON.stringify(paperOrders));
-    } catch (_err) {
-      // Ignored localStorage access error
+
+  const fetchPaperState = useCallback(async (isBackground = false) => {
+    if (!isBackground) {
+      setPaperStateLoading(true);
     }
-  }, [paperBalance, paperHoldings, paperOrders]);
+    setPaperStateError(null);
+    try {
+      const [portfolios, allPositions, orders] = await Promise.all([
+        paperPortfolioApi.listPortfolios().catch(() => []),
+        paperPortfolioApi.getAllPositions(true).catch(() => []),
+        paperOrdersApi.listOrders().catch(() => []),
+      ]);
+      const portfolio = portfolios[0];
+      setSelectedPaperPortfolioId(portfolio?.id ?? null);
+      setPaperOrders(orders.map((order) => ({
+        id: order.id,
+        order_id: order.order_id,
+        symbol: order.symbol,
+        side: order.side,
+        orderType: "MARKET",
+        quantity: Number(order.quantity),
+        price: Number(order.price),
+        status: "PAPER_EXECUTED",
+        timestamp: order.executed_at,
+        mode: "PAPER",
+        createdAt: order.executed_at,
+        broker_id: order.broker_id,
+        paper_portfolio_id: order.paper_portfolio_id,
+      })));
+      setPaperPositions(allPositions);
+      if (portfolio) {
+        const valuation = await paperPortfolioApi.getValuation(portfolio.id, brokerId).catch(() => null);
+        setPaperValuation(valuation);
+      }
+    } catch (err: any) {
+      if (!isBackground) {
+        setPaperStateError(err.message || "Failed to load server-managed paper trading state.");
+      }
+    } finally {
+      if (!isBackground) {
+        setPaperStateLoading(false);
+      }
+    }
+  }, [brokerId]);
 
   const [selectedBrokerType, setSelectedBrokerType] = useState<BrokerType>('zerodha');
 
@@ -164,16 +170,7 @@ export default function DashboardPage() {
         brokerDataApi.getQuotes(targetBrokerId, ['RELIANCE', 'TCS', 'INFY']).catch(() => []),
       ]);
 
-      if (profData) {
-        setProfile(profData);
-      } else {
-        setProfile({
-          account_id: isZerodha ? 'ZR-DEMO-994' : 'AO-DEMO-882',
-          account_type: 'EQUITY',
-          currency: 'INR',
-        });
-      }
-
+      setProfile(profData);
       setHoldings(holdData);
       setPositions(posData);
       setOrders(ordData);
@@ -187,7 +184,40 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardData();
+    const interval = setInterval(() => {
+      const session = getMarketSessionStatus();
+      if (session.isOpen || session.canExit) {
+        fetchDashboardData();
+      }
+    }, 2500);
+    return () => clearInterval(interval);
   }, [fetchDashboardData]);
+
+  // Real-time Auto-Sync: Refresh Paper Trading state in the background during active market hours
+  useEffect(() => {
+    fetchPaperState(false);
+    const interval = setInterval(() => {
+      const session = getMarketSessionStatus();
+      if (session.isOpen || session.canExit) {
+        fetchPaperState(true);
+      }
+    }, 2500);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const session = getMarketSessionStatus();
+        if (session.isOpen || session.canExit) {
+          fetchPaperState(true);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [fetchPaperState]);
 
   const handleOpenOrderForm = (side: OrderSide, symbol: string = '', price: number = 0) => {
     setOrderFormSide(side);
@@ -202,60 +232,72 @@ export default function DashboardPage() {
   };
 
   const handlePaperOrderCreated = (paperOrder: PaperOrder) => {
-    setPaperOrders((prev) => [paperOrder, ...prev]);
-
-    if (paperOrder.side === 'BUY') {
-      const { newHoldings, tradeValue } = applyBuyOrder(paperHoldings, paperOrder);
-      setPaperHoldings(newHoldings);
-      setPaperBalance((prev) => Math.max(0, prev - tradeValue));
-    } else {
-      const { newHoldings, tradeValue } = applySellOrder(paperHoldings, paperOrder);
-      setPaperHoldings(newHoldings);
-      setPaperBalance((prev) => prev + tradeValue);
-    }
-
-    // Trigger Notification Toast
-    setNotification(`Paper ${paperOrder.side} order executed for ${paperOrder.symbol}`);
-    setTimeout(() => {
-      setNotification(null);
-    }, 4000);
-  };
-
-  const handleCancelPaperOrder = (orderId: string) => {
-    setPaperOrders((current) =>
-      current.map((order) =>
-        order.id === orderId
-          ? {
-              ...order,
-              status: 'CANCELLED',
-            }
-          : order
-      )
-    );
+    setPaperOrders((prev) => [paperOrder, ...prev.filter((order) => order.id !== paperOrder.id)]);
+    fetchPaperState();
+    setNotification(`Paper ${paperOrder.side} order persisted and executed for ${paperOrder.symbol}`);
+    setTimeout(() => setNotification(null), 4000);
   };
 
   const handleResetPaperAccount = () => {
     setConfirmReset(true);
   };
 
-  const executeResetPaperAccount = () => {
-    setPaperBalance(INITIAL_PAPER_BALANCE);
-    setPaperHoldings([]);
-    setPaperOrders([]);
-    setConfirmReset(false);
-    setNotification("Paper account reset successfully. Balance restored to ₹10,00,000.");
-    setTimeout(() => setNotification(null), 4000);
+  const executeResetPaperAccount = async () => {
+    if (!selectedPaperPortfolioId) return;
+    try {
+      await paperPortfolioApi.resetPortfolio(selectedPaperPortfolioId);
+      await fetchPaperState();
+      setConfirmReset(false);
+      setNotification("Paper portfolio reset successfully on the server.");
+      setTimeout(() => setNotification(null), 4000);
+    } catch (err: any) {
+      setNotification(err.message || "Failed to reset paper portfolio.");
+      setTimeout(() => setNotification(null), 4000);
+    }
   };
 
-  // Calculate paper account summary
-  const paperSummary = calculateAccountSummary(paperBalance, paperHoldings);
-  
+  const paperHoldings: PaperHolding[] = useMemo(() => paperPositions.map((pos) => {
+    const quantity = Number(pos.quantity) || 0;
+    const averagePrice = Number(pos.average_price) || 0;
+    const eqMatch = initialEquities.find(e => e.symbol.toUpperCase() === pos.symbol.toUpperCase());
+    const currentPrice = (eqMatch ? eqMatch.price : 0) || Number(pos.last_price) || averagePrice;
+    const investedValue = Number(pos.cost_basis) || quantity * averagePrice;
+    const currentValue = quantity > 0 ? (quantity * currentPrice) : 0;
+    const pnl = quantity > 0 ? (currentValue - investedValue) : (Number(pos.realized_pnl) || 0);
+    return {
+      symbol: pos.symbol,
+      quantity,
+      averagePrice,
+      currentPrice,
+      investedValue,
+      currentValue,
+      pnl,
+      pnlPercent: investedValue > 0 ? (pnl / investedValue) * 100 : 0,
+    };
+  }), [paperPositions]);
+
+  const paperBalance = Number(paperValuation?.cash_balance ?? (paperPositions.length > 0 ? (1000000 - paperHoldings.reduce((sum, h) => sum + h.investedValue, 0)) : 1000000));
+  const paperInvestedValue = paperHoldings.reduce((sum, holding) => sum + holding.investedValue, 0);
+  const paperHoldingsValue = paperHoldings.reduce((sum, holding) => sum + holding.currentValue, 0);
+  const totalUnrealizedPnl = paperHoldings.reduce((sum, holding) => sum + holding.pnl, 0);
+  const totalRealizedPnl = paperPositions.reduce((sum, pos) => sum + (Number(pos.realized_pnl) || 0), 0);
+  const calculatedTotalPnl = totalRealizedPnl + totalUnrealizedPnl;
+  const paperPortfolioValue = Number(paperValuation?.equity ?? (paperBalance + paperHoldingsValue));
+  const paperTotalPnl = Number(paperValuation?.total_pnl) || calculatedTotalPnl;
+
+  const paperSummary = {
+    paperBalance,
+    investedValue: paperInvestedValue,
+    portfolioValue: paperPortfolioValue,
+    totalPnl: paperTotalPnl,
+    realizedPnl: totalRealizedPnl,
+    unrealizedPnl: totalUnrealizedPnl,
+  };
+
   const monitoredPositions = useMemo(() => getMonitoredPositions(paperHoldings, paperSummary.portfolioValue), [paperHoldings, paperSummary.portfolioValue]);
   const positionSummary = useMemo(() => getPositionRiskSummary(monitoredPositions, paperSummary.portfolioValue), [monitoredPositions, paperSummary.portfolioValue]);
-
-  // Analytics
   const paperStats = useMemo(() => calculateTradingStatistics(paperOrders), [paperOrders]);
-  const perfHistory = useMemo(() => calculatePerformanceHistory(paperSummary.portfolioValue, paperSummary.totalPnl), [paperSummary]);
+  const perfHistory = useMemo(() => calculatePerformanceHistory(paperSummary.portfolioValue, paperSummary.totalPnl), [paperSummary.portfolioValue, paperSummary.totalPnl]);
 
   // Existing holding quantity for selected symbol (for SELL validation)
   const existingHolding = paperHoldings.find((h) => h.symbol.toUpperCase() === targetSymbol.toUpperCase());
@@ -362,34 +404,79 @@ export default function DashboardPage() {
       )}
 
       {/* Main Content Area */}
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {/* Paper Trading Reset Bar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ maxWidth: '1480px', margin: '0 auto', padding: '0.5rem 0', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Executive Command Hero Banner */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.6) 100%)',
+          borderRadius: '1rem',
+          border: '1px solid rgba(148, 163, 184, 0.14)',
+          padding: '1.5rem 1.75rem',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.3)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1.25rem',
+          backdropFilter: 'blur(8px)',
+        }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700, color: '#f8fafc' }}>
-              {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening"}, Trader
-            </h1>
-            <p style={{ margin: '0.25rem 0 0 0', color: '#94a3b8', fontSize: '0.875rem' }}>
-                Paper trading dashboard • Real trading disabled
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <h1 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 900, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+                {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening"}, Quantitative Trader
+              </h1>
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                color: '#38bdf8',
+                background: 'rgba(56, 189, 248, 0.12)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                padding: '0.2rem 0.6rem',
+                borderRadius: '1rem',
+              }}>
+                PRO TERMINAL
+              </span>
+            </div>
+            <p style={{ margin: '0.35rem 0 0 0', color: '#94a3b8', fontSize: '0.875rem' }}>
+              Simulated quant paper trading execution sandbox • Real money trading safely gated
             </p>
           </div>
 
-          <button
-            onClick={handleResetPaperAccount}
-            style={{
-              padding: '0.45rem 0.9rem',
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: '0.375rem',
-              color: '#fca5a5',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-          >
-            ↻ Reset Paper Account
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => handleOpenOrderForm('BUY', 'RELIANCE', 2850)}
+              style={{
+                padding: '0.55rem 1.15rem',
+                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                border: 'none',
+                borderRadius: '0.5rem',
+                color: '#ffffff',
+                fontSize: '0.85rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              + Place Paper Order
+            </button>
+
+            <button
+              onClick={handleResetPaperAccount}
+              style={{
+                padding: '0.55rem 1.05rem',
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '0.5rem',
+                color: '#fca5a5',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              ↻ Reset Account
+            </button>
+          </div>
         </div>
 
         {/* Live Market Indices Ticker */}
@@ -402,10 +489,10 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#38bdf8' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#38bdf8', letterSpacing: '-0.01em' }}>
                 BROKER DATA
               </h2>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', background: 'rgba(148, 163, 184, 0.15)', padding: '0.2rem 0.6rem', borderRadius: '1rem' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', background: 'rgba(148, 163, 184, 0.12)', border: '1px solid rgba(148, 163, 184, 0.2)', padding: '0.2rem 0.65rem', borderRadius: '1rem' }}>
                 READ-ONLY BROKER SESSION
               </span>
             </div>
@@ -417,14 +504,15 @@ export default function DashboardPage() {
                 setTimeout(() => setNotification(null), 3000);
               }}
               style={{
-                padding: '0.45rem 0.9rem',
+                padding: '0.45rem 1rem',
                 background: '#0284c7',
                 border: 'none',
-                borderRadius: '0.375rem',
+                borderRadius: '0.45rem',
                 color: '#ffffff',
                 fontSize: '0.8125rem',
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: 'pointer',
+                transition: 'all 0.15s ease',
               }}
             >
               ↻ Refresh Broker Data
@@ -467,42 +555,19 @@ export default function DashboardPage() {
         />
 
         {/* 2C. Smart Alerts & Activity Timeline */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }}>
           <SmartAlerts alerts={alerts} onRefresh={() => setAlerts(getAlerts())} />
           <ActivityCenter orders={paperOrders} />
         </div>
 
-        {/* Risk Management Section */}
-        <div style={{ background: '#1e293b', borderRadius: '0.75rem', border: '1px solid #334155', padding: '1.25rem' }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.125rem', color: '#38bdf8', fontWeight: 700 }}>
-            Risk Management
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem' }}>
-            <RiskPanel 
-              metrics={{
-                paperBalance: paperSummary.paperBalance,
-                portfolioValue: paperSummary.portfolioValue,
-                totalExposure: paperSummary.investedValue,
-                exposurePercent: (paperSummary.investedValue / paperSummary.paperBalance) * 100,
-                dailyPnl: paperSummary.totalPnl,
-                dailyLossLimit: getDefaultRiskLimits().maxDailyLoss,
-                remainingDailyLoss: getDefaultRiskLimits().maxDailyLoss + paperSummary.totalPnl
-              }}
-              limits={getDefaultRiskLimits()}
-            />
-            <RiskLimitsCard limits={getDefaultRiskLimits()} />
-          </div>
-        </div>
-
         {/* 3. Market Overview */}
         <MarketOverview />
-...
 
         {/* Strategy & Signals Section */}
         <div style={{ background: '#1e293b', borderRadius: '0.75rem', border: '1px solid #334155', padding: '1.5rem' }}>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.5rem' }}>Strategy & Signals</h2>
           <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-            Mock strategy signals for paper trading only. Not financial advice. No automated or real trading is enabled.
+            Quantitative strategy signals for paper trading execution. No automated real broker execution without explicit human activation.
           </p>
           <div className="space-y-6">
             <SignalSummary signals={initialEquities.map(createTradingSignal)} />
@@ -515,8 +580,23 @@ export default function DashboardPage() {
 
         {/* Risk & Position Monitor Section */}
         <div style={{ background: '#1e293b', borderRadius: '0.75rem', border: '1px solid #334155', padding: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1.5rem' }}>Risk & Position Monitor</h2>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1.5rem' }}>Risk Management & Position Monitor</h2>
           <div className="space-y-6">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              <RiskPanel 
+                metrics={{
+                  paperBalance: paperSummary.paperBalance,
+                  portfolioValue: paperSummary.portfolioValue,
+                  totalExposure: paperSummary.investedValue,
+                  exposurePercent: (paperSummary.investedValue / (paperSummary.paperBalance || 1)) * 100,
+                  dailyPnl: paperSummary.totalPnl,
+                  dailyLossLimit: getDefaultRiskLimits().maxDailyLoss,
+                  remainingDailyLoss: getDefaultRiskLimits().maxDailyLoss + paperSummary.totalPnl
+                }}
+                limits={getDefaultRiskLimits()}
+              />
+              <RiskLimitsCard limits={getDefaultRiskLimits()} />
+            </div>
             <PositionRiskSummaryComp summary={positionSummary} />
             <PositionMonitor positions={monitoredPositions} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -526,120 +606,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Paper Portfolio Summary Card */}
-        <div style={{
-          background: '#1e293b',
-          borderRadius: '0.75rem',
-          border: '1px solid #334155',
-          padding: '1.25rem',
-        }}>
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.125rem', color: '#38bdf8', fontWeight: 700 }}>
-            Paper Portfolio Summary
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-            <div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Invested Value</span>
-              <p style={{ margin: '0.2rem 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>
-                ₹{paperSummary.investedValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Portfolio Value</span>
-              <p style={{ margin: '0.2rem 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#818cf8' }}>
-                ₹{paperSummary.portfolioValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Total P&L</span>
-              <p style={{ margin: '0.2rem 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: paperSummary.totalPnl >= 0 ? '#4ade80' : '#f87171' }}>
-                {paperSummary.totalPnl >= 0 ? '+' : ''}₹{paperSummary.totalPnl.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Win Rate</span>
-              <p style={{ margin: '0.2rem 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>
-                {paperStats.winRate.toFixed(1)}%
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Analytics Section */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
           <PerformanceChart data={perfHistory} />
-          
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100" style={{background: '#1e293b', border: '1px solid #334155'}}>
-             <h3 className="text-lg font-semibold text-gray-800" style={{color: '#f8fafc'}}>Trading Statistics</h3>
-             <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem'}}>
-               <div style={{background: '#0f172a', padding: '1rem', borderRadius: '0.5rem'}}>
-                 <span style={{color: '#94a3b8'}}>Total Orders</span>
-                 <p style={{fontSize: '1.5rem', fontWeight: 700}}>{paperStats.totalOrders}</p>
-               </div>
-               <div style={{background: '#0f172a', padding: '1rem', borderRadius: '0.5rem'}}>
-                 <span style={{color: '#94a3b8'}}>Win Rate</span>
-                 <p style={{fontSize: '1.5rem', fontWeight: 700, color: '#4ade80'}}>{paperStats.winRate.toFixed(1)}%</p>
-               </div>
-               <div style={{background: '#0f172a', padding: '1rem', borderRadius: '0.5rem'}}>
-                 <span style={{color: '#94a3b8'}}>Buy Orders</span>
-                 <p style={{fontSize: '1.5rem', fontWeight: 700}}>{paperStats.buyOrders}</p>
-               </div>
-               <div style={{background: '#0f172a', padding: '1rem', borderRadius: '0.5rem'}}>
-                 <span style={{color: '#94a3b8'}}>Sell Orders</span>
-                 <p style={{fontSize: '1.5rem', fontWeight: 700}}>{paperStats.sellOrders}</p>
-               </div>
-             </div>
-          </div>
         </div>
 
-        {/* Broker ID Connector Bar */}
-        <div style={{
-          background: '#1e293b',
-          borderRadius: '0.5rem',
-          padding: '0.75rem 1.25rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          border: '1px solid #334155',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#94a3b8' }}>Connected Broker:</span>
-            <input
-              type="text"
-              value={brokerId}
-              onChange={(e) => setBrokerId(e.target.value)}
-              style={{
-                padding: '0.4rem 0.75rem',
-                background: '#0f172a',
-                border: '1px solid #334155',
-                borderRadius: '0.375rem',
-                color: '#f8fafc',
-                fontFamily: 'monospace',
-                fontSize: '0.875rem',
-                width: '300px',
-              }}
-              placeholder="Enter Broker UUID"
-            />
+        {paperStateError && (
+          <div style={{ padding: '0.85rem 1rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #ef4444', borderRadius: '0.5rem', color: '#fca5a5' }}>
+            {paperStateError} <button onClick={() => fetchPaperState(false)} style={{ marginLeft: '0.75rem' }}>Retry</button>
           </div>
-
-          <button
-            onClick={fetchDashboardData}
-            disabled={loading}
-            style={{
-              padding: '0.45rem 1rem',
-              background: '#0284c7',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '0.375rem',
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '0.875rem',
-            }}
-          >
-            {loading ? 'Refreshing Data...' : 'Sync Broker Data'}
-          </button>
-        </div>
+        )}
+        {paperStateLoading && (
+          <div style={{ padding: '0.65rem 1rem', color: '#94a3b8', fontSize: '0.8rem' }}>Loading persisted PAPER account state…</div>
+        )}
 
         {error && (
           <div style={{
@@ -653,11 +632,17 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* 4. Watchlist + Portfolio / Profile */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>
+        {/* 4. Watchlist + Paper Holdings */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '1.5rem' }}>
           <Watchlist onTrade={(equity, side) => handleOpenOrderForm(side, equity.symbol, equity.price)} />
-          <HoldingsTable holdings={holdings} loading={loading} />
-          <ProfileCard profile={profile} loading={loading} />
+          <HoldingsTable
+            holdings={holdings.length > 0 ? holdings : paperHoldings.map(h => ({
+              symbol: h.symbol,
+              quantity: String(h.quantity),
+              average_price: String(h.averagePrice),
+            }))}
+            loading={loading}
+          />
         </div>
 
         {/* Live Quotes Widget */}
@@ -668,28 +653,33 @@ export default function DashboardPage() {
         />
 
         {/* 5. Net Positions */}
-        <PositionsTable positions={positions} loading={loading} />
+        <PositionsTable
+          positions={positions.length > 0 ? positions : paperPositions.map(p => ({
+            symbol: p.symbol,
+            side: 'buy' as const,
+            quantity: String(p.quantity),
+            avg_price: String(p.average_price),
+          }))}
+          loading={loading}
+        />
 
         {/* Recent Paper Orders Component */}
-        <RecentPaperOrders orders={paperOrders.slice(0, 5)} onCancel={handleCancelPaperOrder} />
+        <RecentPaperOrders orders={paperOrders.slice(0, 5)} />
 
         {/* Recent Trades Journal */}
-        <div style={{ background: '#1e293b', padding: '1.25rem', borderRadius: '0.75rem' }}>
+        <div style={{ background: '#1e293b', padding: '1.25rem', borderRadius: '0.75rem', border: '1px solid #334155' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <h3 style={{ color: '#38bdf8', fontWeight: 700 }}>Recent Trades</h3>
-            <button onClick={() => navigate(ROUTES.JOURNAL)} style={{ color: '#38bdf8', fontSize: '0.875rem' }}>View Trading Journal</button>
+            <button onClick={() => navigate(ROUTES.JOURNAL)} style={{ color: '#38bdf8', fontSize: '0.875rem', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>View Trading Journal →</button>
           </div>
           <TradingJournalTable entries={getJournalEntries().slice(0, 5)} />
         </div>
-
-        {/* 6. Recent Broker Orders */}
-        <OrdersTable orders={orders} loading={loading} />
 
         {/* 7. Quick Actions */}
         <QuickActions onNavigateTab={setActiveTab} onOpenOrderForm={handleOpenOrderForm} />
       </div>
 
-      {/* Paper Order Form Modal */}
+      {/* Order Form Modal (Paper Mode Default, Live Broker Gated) */}
       {isOrderFormOpen && (
         <OrderForm
           initialSymbol={targetSymbol}
@@ -697,6 +687,9 @@ export default function DashboardPage() {
           initialPrice={targetPrice}
           paperBalance={paperBalance}
           existingHoldingQty={existingHoldingQty}
+          selectedBrokerId={brokerId}
+          selectedBrokerName={selectedBrokerType === 'zerodha' ? 'Zerodha (Kite)' : 'Angel One (SmartAPI)'}
+          hasActiveSession={activeBrokerConnection.status === 'connected'}
           currentExposure={paperSummary.investedValue}
           dailyPnl={paperSummary.totalPnl}
           onClose={() => {
@@ -707,6 +700,11 @@ export default function DashboardPage() {
             handlePaperOrderCreated(order);
             setIsOrderFormOpen(false);
             setSignalTrade(null);
+          }}
+          onLiveOrderCreated={(liveOrder) => {
+            fetchDashboardData();
+            setNotification(`Live order submitted: ${liveOrder.order_id}`);
+            setTimeout(() => setNotification(null), 4000);
           }}
         />
       )}

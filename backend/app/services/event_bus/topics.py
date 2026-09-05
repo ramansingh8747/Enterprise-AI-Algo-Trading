@@ -3,6 +3,10 @@ from uuid import UUID
 
 class Topic:
     @staticmethod
+    def admin_events() -> str:
+        return "admin:events"
+
+    @staticmethod
     def market(symbol: str) -> str:
         return f"market:{symbol.upper()}"
 

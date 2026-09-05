@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { strategyApi, StrategyDefinition, StrategyInstance } from '@/services/api/strategyApi';
+import { strategyApi, strategyImportApi, StrategyDefinition, StrategyInstance } from '@/services/api/strategyApi';
 import { LoadingState } from '@/components/common/LoadingState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { StrategyInstanceList } from '@/components/strategy/StrategyInstanceList';
 import { StrategyCreateInstanceForm } from '@/components/strategy/StrategyCreateInstanceForm';
-import '../styles/StrategyDetails.css';
+import './styles/StrategyDetails.css';
 
 export default function StrategyDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -52,6 +52,17 @@ export default function StrategyDetailsPage() {
     return <ErrorState message="Strategy not found" onRetry={() => navigate('/strategies')} />;
   }
 
+
+  const sourceImportId = (() => {
+    if (!strategy?.config_json) return null;
+    try {
+      const parsed = JSON.parse(strategy.config_json);
+      return parsed?.source?.import_id || null;
+    } catch {
+      return null;
+    }
+  })();
+
   const handleInstanceCreated = (instance: StrategyInstance) => {
     setShowCreateInstance(false);
     setInstanceRefreshKey((key) => key + 1);
@@ -70,6 +81,11 @@ export default function StrategyDetailsPage() {
           <button className="btn btn-secondary" onClick={() => navigate(`/strategies/${id}/edit`)}>
             Edit
           </button>
+          {sourceImportId && (
+            <button className="btn btn-secondary" onClick={() => void strategyImportApi.download(sourceImportId)}>
+              Download Source
+            </button>
+          )}
         </div>
       </div>
 

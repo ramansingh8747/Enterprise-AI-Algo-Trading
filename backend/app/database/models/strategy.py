@@ -94,11 +94,20 @@ class StrategySignal(Base):
     symbol: Mapped[str] = mapped_column(String(64), nullable=False)
     side: Mapped[str] = mapped_column(String(16), nullable=False) # BUY or SELL
     quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    suggested_quantity: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 4), nullable=True)
+    actual_quantity: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 4), nullable=True)
     order_type: Mapped[str] = mapped_column(String(32), nullable=False, default="MARKET")
     price: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 4), nullable=True)
+    stop_loss: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 4), nullable=True)
+    target: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 4), nullable=True)
+    risk_reward: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    indicators_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     signal_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PROPOSED") # PROPOSED, EXECUTED, REJECTED, FAILED
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PROPOSED") # PROPOSED, VIEWED, APPROVED, REJECTED, IGNORED, EXPIRED, FAILED
+    executed_order_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    actioned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)

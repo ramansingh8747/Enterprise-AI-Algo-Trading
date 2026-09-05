@@ -63,27 +63,44 @@ export const AccountSummary: React.FC<AccountSummaryProps> = ({
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
         {cards.map((c, i) => (
           <div
             key={i}
             style={{
-              background: '#1e293b',
-              borderRadius: '0.75rem',
-              border: '1px solid #334155',
-              padding: '1.25rem',
-              boxShadow: '0 4px 6px -1px rgba(0,0,0,0.2)',
+              background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%)',
+              borderRadius: '0.85rem',
+              border: '1px solid rgba(148, 163, 184, 0.12)',
+              padding: '1.25rem 1.4rem',
+              boxShadow: '0 8px 20px -4px rgba(0, 0, 0, 0.3)',
+              position: 'relative',
+              overflow: 'hidden',
+              backdropFilter: 'blur(8px)',
+              transition: 'transform 0.18s ease, border-color 0.18s ease',
             }}
           >
-            <span style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 500, display: 'block' }}>
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '3px',
+                background: `linear-gradient(90deg, ${c.color} 0%, transparent 100%)`,
+              }}
+            />
+
+            <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
               {c.title}
             </span>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: c.color, margin: '0.35rem 0' }}>
+            <div style={{ fontSize: '1.65rem', fontWeight: 900, color: c.color, margin: '0.4rem 0', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
               {c.value}
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-              {c.subtitle}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                {c.subtitle}
+              </span>
+            </div>
           </div>
         ))}
       </div>

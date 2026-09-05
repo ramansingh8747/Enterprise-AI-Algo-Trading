@@ -14,6 +14,7 @@ import {
 } from '@/context/WebSocketProvider';
 import { useWebSocketSubscription } from '@/hooks/useWebSocketSubscription';
 import { AuthContext } from '@/context/AuthContext';
+import { setActiveSessionScope } from '@/services/auth/session';
 import { WebSocketEvent, isValidWebSocketEvent } from '@/types/websocket';
 
 // ---------------------------------------------------------------------------
@@ -112,13 +113,15 @@ describe('Frontend WebSocket Client (Step 13.21I.34.118)', () => {
     MockWebSocket.instances = [];
     // @ts-expect-error Mocking global WebSocket
     global.WebSocket = MockWebSocket;
-    localStorage.setItem('access_token', 'test_jwt_token_123');
+    localStorage.setItem('trader_access_token', 'test_jwt_token_123');
+    setActiveSessionScope('trader');
   });
 
   afterEach(() => {
     vi.useRealTimers();
     global.WebSocket = originalWebSocket;
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   // Test 1: getWebSocketUrl

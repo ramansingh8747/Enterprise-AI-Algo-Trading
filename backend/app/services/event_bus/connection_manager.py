@@ -44,6 +44,15 @@ class WebSocketConnectionManager:
         logger.info(f"WebSocket disconnected for user {user_id}")
 
     async def subscribe(self, websocket: WebSocket, user_id: UUID, topic: str):
+        # Admin trading-event stream is restricted to ADMIN users.
+        if topic == "admin:events":
+            with SessionLocal() as db:
+                user = db.query(User).filter(User.id == user_id).first()
+                if not user or user.role != UserRole.ADMIN:
+                    logger.warning("Unauthorized admin event subscription attempt: user=%s", user_id)
+                    await self.send_error(websocket, 403, "Forbidden: Admin role required.")
+                    return
+
         # Strategy topic ownership authorization check
         if "strategy:" in topic:
             try:
@@ -80,7 +89,10 @@ class WebSocketConnectionManager:
         try:
             while True:
                 event = await subscriber.consume()
-                await websocket.send_json(event.model_dump())
+                payload = event.model_dump(mode="json")
+                # Include the subscribed topic so clients can route shared admin events.
+                payload["topic"] = subscriber.topic
+                await websocket.send_json(payload)
         except Exception as e:
             logger.error(f"Error consuming events: {e}")
         finally:

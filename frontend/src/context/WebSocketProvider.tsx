@@ -14,6 +14,7 @@ import React, {
   ReactNode,
 } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { getSessionToken } from '@/services/auth/session';
 import {
   WebSocketConnectionState,
   WebSocketEventCallback,
@@ -111,9 +112,12 @@ export const WebSocketProvider: React.FC<{ children: ReactNode }> = ({ children 
       socketRef.current = null;
     }
 
-    setState((prev) => (prev === 'RECONNECTING' ? 'RECONNECTING' : 'CONNECTING'));
+    const token = getSessionToken();
+    if (!token) {
+      setState('DISCONNECTED');
+      return;
+    }
 
-    const token = localStorage.getItem('access_token');
     const wsUrl = getWebSocketUrl(token);
 
     try {

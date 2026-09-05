@@ -10,7 +10,9 @@ from app.database.repositories.order_idempotency_repository import OrderIdempote
 from app.exceptions.idempotency_exceptions import (
     IdempotencyConflictException,
     IdempotencyPayloadMismatchException,
+    IdempotencyUnknownOutcomeException,
 )
+from app.exceptions.broker_exceptions import BrokerNetworkException
 from app.core.logging.logger import logger
 
 T = TypeVar("T")
@@ -102,6 +104,11 @@ class IdempotencyService:
                 payload_dict = json.loads(record.response_payload)
                 return deserialize_fn(payload_dict)
 
+            if record.status == "UNKNOWN":
+                raise IdempotencyUnknownOutcomeException(
+                    "Previous broker attempt has an unknown outcome. Reconcile broker orders before retrying."
+                )
+
             if record.status == "FAILED" and record.response_payload:
                 logger.info(
                     f"Replaying stored failed idempotency record for key={clean_key}, user_id={user_id}, broker_id={broker_id}"
@@ -121,6 +128,15 @@ class IdempotencyService:
                 response_payload=json.dumps(serialized_result),
             )
             return result
+        except BrokerNetworkException as exc:
+            # A broker timeout/network failure can happen after the broker accepted
+            # the order. Never mark this as FAILED and never allow an automatic retry.
+            err_dict = {"error": str(exc), "outcome": "UNKNOWN", "reconciliation_required": True}
+            self.repository.mark_unknown(
+                record_id=record.id,
+                response_payload=json.dumps(err_dict),
+            )
+            raise IdempotencyUnknownOutcomeException(str(exc)) from exc
         except Exception as exc:
             err_dict = {"error": str(exc)}
             self.repository.mark_failed(

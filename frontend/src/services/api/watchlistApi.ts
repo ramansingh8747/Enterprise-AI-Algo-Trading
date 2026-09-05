@@ -25,35 +25,34 @@ export interface WatchlistCreatePayload {
 }
 
 class WatchlistApi extends BaseApi {
-  constructor() {
-    super();
-    this.http.defaults.baseURL += '/watchlists';
-  }
-
   async getWatchlists(): Promise<ServerWatchlist[]> {
-    return this.handleRequest<ServerWatchlist[]>(this.http.get(''));
+    return this.handleRequest<ServerWatchlist[]>(this.http.get('/watchlists'), false);
   }
 
   async createWatchlist(payload: WatchlistCreatePayload): Promise<ServerWatchlist> {
-    return this.handleRequest<ServerWatchlist>(this.http.post('', payload));
+    return this.handleRequest<ServerWatchlist>(this.http.post('/watchlists', payload), false);
   }
 
   async getWatchlist(id: string): Promise<ServerWatchlist> {
-    return this.handleRequest<ServerWatchlist>(this.http.get(`/${id}`));
+    return this.handleRequest<ServerWatchlist>(this.http.get(`/watchlists/${id}`), false);
   }
 
   async addItem(watchlistId: string, symbol: string): Promise<ServerWatchlistItem> {
     return this.handleRequest<ServerWatchlistItem>(
-      this.http.post(`/${watchlistId}/items`, { symbol })
+      this.http.post(`/watchlists/${watchlistId}/items`, { symbol }),
+      false
     );
   }
 
   async removeItem(watchlistId: string, symbol: string): Promise<void> {
-    await this.handleRequest<void>(this.http.delete(`/${watchlistId}/items/${encodeURIComponent(symbol)}`));
+    await this.handleRequest<void>(
+      this.http.delete(`/watchlists/${watchlistId}/items/${encodeURIComponent(symbol)}`),
+      false
+    );
   }
 
   async deleteWatchlist(watchlistId: string): Promise<void> {
-    await this.handleRequest<void>(this.http.delete(`/${watchlistId}`));
+    await this.handleRequest<void>(this.http.delete(`/watchlists/${watchlistId}`), false);
   }
 }
 

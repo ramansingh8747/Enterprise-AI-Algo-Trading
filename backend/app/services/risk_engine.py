@@ -26,6 +26,7 @@ class RiskEngine:
         request: BrokerOrderRequest,
         current_positions: Optional[List[Dict[str, Any]]] = None,
         daily_pnl: Optional[Decimal] = None,
+        current_exposure_notional: Optional[Decimal] = None,
     ) -> None:
         """
         Runs pre-trade risk guardrail checks in strict order:
@@ -38,9 +39,12 @@ class RiskEngine:
         7. Daily Loss & Drawdown Thresholds
         """
         settings = self._repository.get_risk_settings(user_id=user_id, broker_id=broker_id)
+        global_settings = self._repository.get_global_risk_settings()
 
-        # 1. Emergency Kill Switch Guard
-        if settings.kill_switch_active:
+        # 1. Emergency Kill Switch Guard. The platform-wide switch always wins
+        # over scoped user/broker settings so an admin emergency stop cannot be
+        # bypassed by a more specific risk configuration.
+        if global_settings.kill_switch_active or settings.kill_switch_active:
             logger.warning(f"Order rejected for user {user_id}: Emergency kill switch is active.")
             raise TradingHaltedException("Trading is currently halted by emergency kill switch.")
 
@@ -87,7 +91,21 @@ class RiskEngine:
                     f"Projected position quantity {projected_qty} for {request.symbol} exceeds limit of {settings.max_position_quantity}."
                 )
 
-        # 6. Daily Loss Guard (If daily_pnl is provided)
+        # 6. Portfolio Exposure Guard (when authoritative exposure is available)
+        if current_exposure_notional is not None and request.side.upper() == "BUY":
+            projected_exposure = current_exposure_notional
+            if effective_price > Decimal("0"):
+                projected_exposure += request.quantity * effective_price
+            if projected_exposure > settings.max_exposure_notional:
+                logger.warning(
+                    "Projected exposure %s exceeds max allowed %s for user %s.",
+                    projected_exposure, settings.max_exposure_notional, user_id,
+                )
+                raise RiskLimitExceededException(
+                    f"Projected portfolio exposure {projected_exposure} exceeds maximum allowed limit of {settings.max_exposure_notional}."
+                )
+
+        # 7. Daily Loss Guard (If daily_pnl is provided)
         if daily_pnl is not None and daily_pnl < Decimal("0"):
             loss_amount = abs(daily_pnl)
             if loss_amount >= settings.daily_loss_limit:

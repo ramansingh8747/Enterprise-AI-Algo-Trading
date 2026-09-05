@@ -1,6 +1,7 @@
 from typing import Annotated, List
 
-from fastapi import Depends, WebSocket
+from fastapi import Depends, WebSocket, status
+from fastapi.exceptions import WebSocketException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -87,9 +88,13 @@ def get_current_user_ws(
 
     if not token:
         logger.warning("Unauthorized WebSocket access attempt — no token provided")
-        raise UnauthorizedException()
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Missing authentication token")
 
-    return service.get_current_user(token)
+    try:
+        return service.get_current_user(token)
+    except Exception as e:
+        logger.warning(f"Unauthorized WebSocket access attempt — invalid token: {e}")
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or expired token")
 
 
 def get_current_active_user_ws(
@@ -97,7 +102,7 @@ def get_current_active_user_ws(
 ) -> UserResponse:
     """FastAPI dependency that enforces the authenticated WebSocket user is active."""
     if not current_user.is_active:
-        raise InactiveUserException()
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="User account is inactive")
     return current_user
 
 

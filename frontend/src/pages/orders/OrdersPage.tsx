@@ -3,37 +3,28 @@ import { RecentPaperOrders } from "@/components/dashboard/RecentPaperOrders";
 import { TradingExecutionAnalytics } from "@/components/dashboard/TradingExecutionAnalytics";
 import { OrderForm, OrderSide, PaperOrder } from "@/components/dashboard/OrderForm";
 import { brokerOrdersApi } from "@/services/api/brokerOrdersApi";
-import { BrokerOrderResponse } from "@/types/brokerOrder";
+import { paperOrdersApi } from "@/services/api/paperOrdersApi";
+import { BrokerOrderLedgerResponse, BrokerOrderResponse } from "@/types/brokerOrder";
 import { calculateOrderAnalytics } from "@/services/paperTrading/orderAnalyticsService";
 import { JournalEntryModal, JournalEntryModalProps } from "@/components/dashboard/JournalEntryModal";
+import { getMarketSessionStatus } from "@/utils/marketTiming";
 
 
-
-const PAPER_ORDERS_KEY = "algo_trading_paper_orders";
 
 export const OrdersPage: React.FC = () => {
   const [mode, setMode] = useState<'PAPER' | 'LIVE'>('PAPER');
   const [brokerId, setBrokerId] = useState<string>("c2ce3afe-4468-49fc-9278-880111831207");
-  const [liveOrders, setLiveOrders] = useState<BrokerOrderResponse[]>([]);
+  const [liveOrders, setLiveOrders] = useState<BrokerOrderLedgerResponse[]>([]);
 
-  const [paperOrders, setPaperOrders] = useState<PaperOrder[]>(() => {
-    try {
-      const stored = localStorage.getItem(PAPER_ORDERS_KEY);
-      const parsed = stored ? JSON.parse(stored) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      console.error("Failed to load paper orders:", e);
-      return [];
-    }
-  });
-
+  const [paperOrders, setPaperOrders] = useState<PaperOrder[]>([]);
+  const [paperLoading, setPaperLoading] = useState<boolean>(false);
+  const [paperError, setPaperError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [cancelLoading, setCancelLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
   // Cancel Modal state
-  const [cancelPaperOrderId, setCancelPaperOrderId] = useState<string | null>(null);
   const [cancelLiveOrder, setCancelLiveOrder] = useState<BrokerOrderResponse | null>(null);
 
   // OrderForm state
@@ -47,21 +38,47 @@ export const OrdersPage: React.FC = () => {
   const [journalModalData, setJournalModalData] = useState<JournalEntryModalProps['initialData'] | null>(null);
 
 
-  // Persist paperOrders changes to localStorage
-  useEffect(() => {
+  const fetchPaperOrders = useCallback(async (background: boolean | React.SyntheticEvent = false) => {
+    const isBg = typeof background === 'boolean' ? background : false;
+    if (!isBg) setPaperLoading(true);
+    setPaperError(null);
     try {
-      localStorage.setItem(PAPER_ORDERS_KEY, JSON.stringify(paperOrders));
-    } catch (_err) {
-      // Ignored localStorage access error
+      const data = await paperOrdersApi.listOrders();
+      setPaperOrders(data.map((order) => ({
+        id: order.id,
+        order_id: order.order_id,
+        symbol: order.symbol,
+        side: order.side,
+        orderType: "MARKET",
+        quantity: Number(order.quantity),
+        price: Number(order.price),
+        status: "PAPER_EXECUTED",
+        timestamp: order.executed_at,
+        mode: "PAPER",
+        createdAt: order.executed_at,
+        broker_id: order.broker_id,
+        paper_portfolio_id: order.paper_portfolio_id,
+        orderSource: (order as any).order_source || (order as any).orderSource || "AUTO_PILOT",
+      })));
+    } catch (err: any) {
+      if (err.status === 401) {
+        setPaperError("Authentication required to view paper orders.");
+      } else {
+        setPaperError(err.message || "Failed to load persisted paper orders.");
+      }
+    } finally {
+      if (!isBg) setPaperLoading(false);
     }
-  }, [paperOrders]);
+  }, []);
 
-  const fetchLiveOrders = useCallback(async () => {
+  const fetchLiveOrders = useCallback(async (background: boolean | React.SyntheticEvent = false) => {
+    const isBg = typeof background === 'boolean' ? background : false;
     if (!brokerId.trim() || mode !== 'LIVE') return;
-    setLoading(true);
+    if (!isBg) setLoading(true);
     setError(null);
     try {
-      const data = await brokerOrdersApi.getOrders(brokerId);
+      await brokerOrdersApi.getOrders(brokerId);
+      const data = await brokerOrdersApi.getLedger(brokerId);
       setLiveOrders(data);
     } catch (err: any) {
       if (err.status === 401) {
@@ -74,36 +91,65 @@ export const OrdersPage: React.FC = () => {
         setError(err.message || "Failed to load live broker orders.");
       }
     } finally {
+      if (!isBg) setLoading(false);
+    }
+  }, [brokerId, mode]);
+
+  const reconcileLiveOrders = useCallback(async () => {
+    if (!brokerId.trim() || mode !== 'LIVE') return;
+    setLoading(true);
+    setError(null);
+    try {
+      await brokerOrdersApi.reconcileOrders(brokerId);
+      const data = await brokerOrdersApi.getLedger(brokerId);
+      setLiveOrders(data);
+      setNotification('Broker order lifecycle reconciled successfully.');
+      setTimeout(() => setNotification(null), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to reconcile broker order lifecycle.');
+    } finally {
       setLoading(false);
     }
   }, [brokerId, mode]);
 
+  // Real-time Auto-Sync: Refresh Orders during active market hours only
   useEffect(() => {
-    if (mode === 'LIVE') {
+    if (mode === 'PAPER') {
+      fetchPaperOrders(false);
+    } else {
       fetchLiveOrders();
     }
-  }, [mode, fetchLiveOrders]);
 
-  const handleCancelPaperOrder = (orderId: string) => {
-    setCancelPaperOrderId(orderId);
-  };
+    const interval = setInterval(() => {
+      const session = getMarketSessionStatus();
+      if (!session.isOpen && !session.canExit) return;
 
-  const executeCancelPaperOrder = () => {
-    if (!cancelPaperOrderId) return;
-    setPaperOrders((current) =>
-      current.map((order) =>
-        order.id === cancelPaperOrderId
-          ? {
-              ...order,
-              status: "CANCELLED",
-            }
-          : order
-      )
-    );
-    setCancelPaperOrderId(null);
-    setNotification("Paper order cancelled successfully.");
-    setTimeout(() => setNotification(null), 3000);
-  };
+      if (mode === 'PAPER') {
+        fetchPaperOrders(true);
+      } else {
+        fetchLiveOrders();
+      }
+    }, 2500);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const session = getMarketSessionStatus();
+        if (session.isOpen || session.canExit) {
+          if (mode === 'PAPER') {
+            fetchPaperOrders(true);
+          } else {
+            fetchLiveOrders();
+          }
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [mode, fetchPaperOrders, fetchLiveOrders]);
 
   const executeCancelLiveOrder = async () => {
     if (!cancelLiveOrder || !brokerId) return;
@@ -124,10 +170,38 @@ export const OrdersPage: React.FC = () => {
     }
   };
 
-  const analyticsSummary = useMemo(() => calculateOrderAnalytics(paperOrders), [paperOrders]);
+  const [orderModeFilter] = useState<'ALL' | '15MIN_SCALPER' | 'FULL_DAY'>(() => {
+    try {
+      const saved = localStorage.getItem('active_session_mode');
+      if (saved === '15MIN_SCALPER') return '15MIN_SCALPER';
+      if (saved === 'FULL_DAY') return 'FULL_DAY';
+    } catch {}
+    return 'ALL';
+  });
+
+  const isScalperOrder = useCallback((order: PaperOrder) => {
+    const sym = (order.symbol || "").toUpperCase();
+    return (
+      sym.includes("NIFTY") ||
+      sym.includes("BANKNIFTY") ||
+      ((order as any).orderSource || "").toUpperCase().includes("SCALP")
+    );
+  }, []);
+
+  const displayedPaperOrders = useMemo(() => {
+    if (orderModeFilter === '15MIN_SCALPER') {
+      return paperOrders.filter(isScalperOrder);
+    }
+    if (orderModeFilter === 'FULL_DAY') {
+      return paperOrders.filter(o => !isScalperOrder(o));
+    }
+    return paperOrders;
+  }, [paperOrders, orderModeFilter, isScalperOrder]);
+
+  const analyticsSummary = useMemo(() => calculateOrderAnalytics(displayedPaperOrders), [displayedPaperOrders]);
 
   return (
-    <div style={{ padding: "1.5rem", color: "#f8fafc", fontFamily: "system-ui, sans-serif", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+    <div style={{ padding: "clamp(0.5rem, 2vw, 1.5rem)", color: "#f8fafc", fontFamily: "system-ui, sans-serif", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
       {/* Top Bar Header & Controls */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
         <div>
@@ -137,7 +211,7 @@ export const OrdersPage: React.FC = () => {
           </span>
         </div>
 
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
           {/* Mode Selector Tabs */}
           <div style={{ display: "flex", background: "#1e293b", padding: "0.25rem", borderRadius: "0.5rem", border: "1px solid #334155" }}>
             <button
@@ -212,15 +286,23 @@ export const OrdersPage: React.FC = () => {
       {/* MODE 1: PAPER ORDERS */}
       {mode === 'PAPER' && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <TradingExecutionAnalytics orders={paperOrders} analytics={analyticsSummary} />
+          <TradingExecutionAnalytics orders={displayedPaperOrders} analytics={analyticsSummary} />
 
+          {paperError && (
+            <div style={{ padding: "0.75rem 1rem", background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", borderRadius: "0.5rem", color: "#fca5a5", fontSize: "0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>⚠️ {paperError}</span>
+              <button onClick={fetchPaperOrders} style={{ padding: "0.35rem 0.75rem", background: "#ef4444", color: "#ffffff", border: "none", borderRadius: "0.25rem", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>Retry</button>
+            </div>
+          )}
+          {paperLoading && (
+            <div style={{ padding: "0.75rem 1rem", color: "#94a3b8", fontSize: "0.85rem" }}>Loading persisted paper orders…</div>
+          )}
           <div style={{ background: "#0f172a", borderRadius: "0.75rem", border: "1px solid #334155", padding: "1.25rem" }}>
             <h3 style={{ margin: "0 0 1rem 0", fontSize: "1.1rem", color: "#fbbf24" }}>
               Paper Order History (Simulated Sandbox)
             </h3>
             <RecentPaperOrders
               orders={paperOrders}
-              onCancel={handleCancelPaperOrder}
               onAddToJournal={(order) => {
                 setJournalModalData({
                   symbol: order.symbol,
@@ -276,9 +358,29 @@ export const OrdersPage: React.FC = () => {
             >
               {loading ? "Refreshing..." : "Refresh Live Orders"}
             </button>
+            <button
+              onClick={reconcileLiveOrders}
+              disabled={loading}
+              style={{
+                padding: "0.5rem 1rem", background: "#334155", color: "#e2e8f0",
+                border: "1px solid #475569", borderRadius: "0.375rem", fontWeight: 700,
+                fontSize: "0.8rem", cursor: loading ? "not-allowed" : "pointer",
+              }}
+            >
+              Reconcile Lifecycle
+            </button>
           </div>
 
           {/* Live Broker Orders Table */}
+          {paperError && (
+            <div style={{ padding: "0.75rem 1rem", background: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", borderRadius: "0.5rem", color: "#fca5a5", fontSize: "0.85rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>⚠️ {paperError}</span>
+              <button onClick={fetchPaperOrders} style={{ padding: "0.35rem 0.75rem", background: "#ef4444", color: "#ffffff", border: "none", borderRadius: "0.25rem", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>Retry</button>
+            </div>
+          )}
+          {paperLoading && (
+            <div style={{ padding: "0.75rem 1rem", color: "#94a3b8", fontSize: "0.85rem" }}>Loading persisted paper orders…</div>
+          )}
           <div style={{ background: "#0f172a", borderRadius: "0.75rem", border: "1px solid #334155", padding: "1.25rem" }}>
             <h3 style={{ margin: "0 0 1rem 0", fontSize: "1.1rem", color: "#38bdf8" }}>
               Live Broker Orders (`GET /broker-orders/{brokerId}`)
@@ -297,7 +399,9 @@ export const OrdersPage: React.FC = () => {
                       <th style={{ padding: "0.6rem 0.75rem" }}>Symbol</th>
                       <th style={{ padding: "0.6rem 0.75rem" }}>Side</th>
                       <th style={{ padding: "0.6rem 0.75rem" }}>Quantity</th>
+                      <th style={{ padding: "0.6rem 0.75rem" }}>Filled</th>
                       <th style={{ padding: "0.6rem 0.75rem" }}>Status</th>
+                      <th style={{ padding: "0.6rem 0.75rem" }}>Last Sync</th>
                       <th style={{ padding: "0.6rem 0.75rem", textAlign: "right" }}>Actions</th>
                     </tr>
                   </thead>
@@ -320,11 +424,13 @@ export const OrdersPage: React.FC = () => {
                           </span>
                         </td>
                         <td style={{ padding: "0.65rem 0.75rem", fontFamily: "monospace" }}>{o.quantity}</td>
+                        <td style={{ padding: "0.65rem 0.75rem", fontFamily: "monospace" }}>{o.filled_quantity}</td>
                         <td style={{ padding: "0.65rem 0.75rem" }}>
                           <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#cbd5e1" }}>
                             {o.status}
                           </span>
                         </td>
+                        <td style={{ padding: "0.65rem 0.75rem", color: "#94a3b8", whiteSpace: "nowrap" }}>{new Date(o.last_broker_sync_at).toLocaleString()}</td>
                         <td style={{ padding: "0.65rem 0.75rem", textAlign: "right", display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
                           <button
                             onClick={() => {
@@ -378,20 +484,6 @@ export const OrdersPage: React.FC = () => {
         </div>
       )}
 
-      {/* Cancel Paper Order Modal */}
-      {cancelPaperOrderId && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 1050, background: "rgba(0, 0, 0, 0.8)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
-          <div style={{ background: "#0f172a", border: "1px solid #334155", borderRadius: "0.75rem", padding: "1.5rem", maxWidth: "400px", width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <h3 style={{ margin: 0, color: "#f8fafc", fontSize: "1.1rem" }}>Cancel Paper Order</h3>
-            <p style={{ margin: 0, fontSize: "0.85rem", color: "#94a3b8" }}>Are you sure you want to cancel paper order {cancelPaperOrderId}?</p>
-            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
-              <button onClick={() => setCancelPaperOrderId(null)} style={{ padding: "0.5rem 1rem", background: "#1e293b", border: "1px solid #334155", color: "#94a3b8", borderRadius: "0.375rem", cursor: "pointer" }}>No, Keep</button>
-              <button onClick={executeCancelPaperOrder} style={{ padding: "0.5rem 1rem", background: "#ef4444", border: "none", color: "#ffffff", borderRadius: "0.375rem", fontWeight: 700, cursor: "pointer" }}>Yes, Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Cancel Live Order Confirmation Modal */}
       {cancelLiveOrder && (
         <div style={{ position: "fixed", inset: 0, zIndex: 1050, background: "rgba(0, 0, 0, 0.8)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
@@ -421,8 +513,8 @@ export const OrdersPage: React.FC = () => {
           hasActiveSession={true}
           onClose={() => setTradeRequest(null)}
           onPaperOrderCreated={(newOrder) => {
-            setPaperOrders((prev) => [newOrder, ...prev]);
-            setNotification("Paper order created successfully.");
+            setPaperOrders((prev) => [newOrder, ...prev.filter((order) => order.id !== newOrder.id)]);
+            setNotification("Paper order persisted and executed successfully.");
             setTimeout(() => setNotification(null), 3000);
           }}
           onLiveOrderCreated={(liveOrder) => {

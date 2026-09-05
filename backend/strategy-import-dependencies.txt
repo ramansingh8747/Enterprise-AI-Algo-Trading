@@ -1,0 +1,2 @@
+# Required by the PDF strategy importer
+pypdf>=5.0,<7

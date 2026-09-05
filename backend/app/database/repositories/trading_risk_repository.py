@@ -86,6 +86,20 @@ class TradingRiskRepository(BaseRepository[TradingRiskSettings]):
         )
         return self.db.execute(stmt).scalar_one() or 0
 
+    def get_global_risk_settings(self) -> TradingRiskSettings:
+        """Return the platform-wide risk settings used as the global safety baseline."""
+        return self.get_risk_settings(user_id=None, broker_id=None)
+
+    def update_global_risk_settings(self, **values) -> TradingRiskSettings:
+        """Persist platform-wide risk limits without changing scoped user/broker overrides."""
+        settings = self.get_global_risk_settings()
+        for field, value in values.items():
+            if value is not None:
+                setattr(settings, field, value)
+        self.db.commit()
+        self.db.refresh(settings)
+        return settings
+
     def set_kill_switch(
         self,
         active: bool,

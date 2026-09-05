@@ -21,37 +21,32 @@ export interface CreateAlertPayload {
 }
 
 export class AlertsApi extends BaseApi {
-  constructor() {
-    super();
-    this.http.defaults.baseURL += "/alerts";
-  }
-
   public async getAlerts(unreadOnly: boolean = false): Promise<ServerAlert[]> {
     return this.handleRequest<ServerAlert[]>(
-      this.http.get("", { params: { unread_only: unreadOnly } })
+      this.http.get("/alerts", { params: { unread_only: unreadOnly } })
     );
   }
 
   public async createAlert(payload: CreateAlertPayload): Promise<ServerAlert> {
-    return this.handleRequest<ServerAlert>(this.http.post("", payload));
+    return this.handleRequest<ServerAlert>(this.http.post("/alerts", payload));
   }
 
   public async markAsRead(alertId: string): Promise<ServerAlert> {
-    return this.handleRequest<ServerAlert>(this.http.patch(`/${alertId}/read`));
+    return this.handleRequest<ServerAlert>(this.http.patch(`/alerts/${alertId}/read`));
   }
 
   public async markAllAsRead(): Promise<{ success: boolean; marked_count: number }> {
     return this.handleRequest<{ success: boolean; marked_count: number }>(
-      this.http.post("/mark-all-read")
+      this.http.post("/alerts/mark-all-read")
     );
   }
 
   public async deleteAlert(alertId: string): Promise<void> {
-    await this.handleRequest<void>(this.http.delete(`/${alertId}`));
+    await this.handleRequest<void>(this.http.delete(`/alerts/${alertId}`));
   }
 
   public async clearAllAlerts(): Promise<void> {
-    await this.handleRequest<void>(this.http.delete(""));
+    await this.handleRequest<void>(this.http.delete("/alerts"));
   }
 }
 

@@ -22,6 +22,7 @@ vi.mock('@/services/api/tradingJournalApi', () => ({
 vi.mock('@/services/api/brokerOrdersApi', () => ({
   brokerOrdersApi: {
     getOrders: vi.fn().mockResolvedValue([]),
+    getLedger: vi.fn().mockResolvedValue([]),
     cancelOrder: vi.fn(),
   },
 }));
@@ -79,15 +80,15 @@ describe('STEP 13.21I.34.133 — Trading Journal Integration', () => {
   });
 
   it('2. OrdersPage allows launching prefilled journal creation modal for orders', async () => {
-    (brokerOrdersApi.getOrders as any).mockResolvedValue([
-      {
-        order_id: 'ORD-LIVE-777',
-        symbol: 'INFY',
-        side: 'BUY',
-        quantity: 25,
-        status: 'COMPLETE',
-      },
-    ]);
+    const liveOrder = {
+      order_id: 'ORD-LIVE-777',
+      symbol: 'INFY',
+      side: 'BUY',
+      quantity: 25,
+      status: 'COMPLETE',
+    };
+    (brokerOrdersApi.getOrders as any).mockResolvedValue([liveOrder]);
+    (brokerOrdersApi.getLedger as any).mockResolvedValue([liveOrder]);
 
     render(
       <MemoryRouter>

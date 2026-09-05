@@ -28,8 +28,8 @@ class PaperPortfolio(Base):
     execution_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="PAPER")
     currency: Mapped[str] = mapped_column(String(8), nullable=False, default="INR")
 
-    initial_balance: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("1000000.0000"))
-    cash_balance: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("1000000.0000"))
+    initial_balance: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("10000.0000"))
+    cash_balance: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("10000.0000"))
     realized_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0.0000"))
 
     created_at: Mapped[datetime] = mapped_column(
@@ -50,9 +50,9 @@ class PaperPortfolio(Base):
         if "currency" not in kwargs:
             kwargs["currency"] = "INR"
         if "initial_balance" not in kwargs:
-            kwargs["initial_balance"] = Decimal("1000000.0000")
+            kwargs["initial_balance"] = Decimal("10000.0000")
         if "cash_balance" not in kwargs:
-            kwargs["cash_balance"] = Decimal("1000000.0000")
+            kwargs["cash_balance"] = Decimal("10000.0000")
         if "realized_pnl" not in kwargs:
             kwargs["realized_pnl"] = Decimal("0.0000")
         super().__init__(**kwargs)
@@ -80,8 +80,14 @@ class PaperPosition(Base):
     quantity: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0.0000"))
     average_price: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0.0000"))
     cost_basis: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0.0000"))
+    stop_loss: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 4), nullable=True)
+    target: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 4), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="OPEN") # OPEN, CLOSED
     realized_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0.0000"))
     unrealized_pnl: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0.0000"))
+    last_price: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 4), nullable=True)
+    market_value: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False, default=Decimal("0.0000"))
+    valuation_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
@@ -106,8 +112,16 @@ class PaperPosition(Base):
             kwargs["average_price"] = Decimal("0.0000")
         if "cost_basis" not in kwargs:
             kwargs["cost_basis"] = Decimal("0.0000")
+        if "stop_loss" not in kwargs:
+            kwargs["stop_loss"] = None
+        if "target" not in kwargs:
+            kwargs["target"] = None
+        if "status" not in kwargs:
+            kwargs["status"] = "OPEN"
         if "realized_pnl" not in kwargs:
             kwargs["realized_pnl"] = Decimal("0.0000")
         if "unrealized_pnl" not in kwargs:
             kwargs["unrealized_pnl"] = Decimal("0.0000")
+        if "market_value" not in kwargs:
+            kwargs["market_value"] = Decimal("0.0000")
         super().__init__(**kwargs)

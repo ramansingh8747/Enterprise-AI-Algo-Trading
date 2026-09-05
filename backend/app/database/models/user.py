@@ -53,6 +53,20 @@ class User(Base):
         String(255),
         nullable=False,
     )
+    phone_number: Mapped[str | None] = mapped_column(
+        String(20),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+    otp_code: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True,
+    )
+    otp_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="userrole", create_type=True),
         nullable=False,

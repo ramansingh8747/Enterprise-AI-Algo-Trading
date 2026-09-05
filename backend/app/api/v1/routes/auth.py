@@ -5,9 +5,13 @@ from fastapi import APIRouter, Depends, status
 from app.core.response import success_response
 from app.dependencies.auth import get_authentication_service, get_current_active_user
 from app.schemas.auth import (
+    ForgotPasswordRequest,
     LoginRequest,
     RefreshTokenRequest,
     RegisterRequest,
+    SendOTPRequest,
+    VerifyOTPRequest,
+    OTPResponse,
     TokenResponse,
     UserResponse,
 )
@@ -95,3 +99,65 @@ def get_me(
         message="User profile retrieved.",
         data=current_user.model_dump(mode="json"),
     )
+
+
+@router.post(
+    "/forgot-password",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Reset account password directly",
+    description="Reset a user account password using their registered email.",
+)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    service: Annotated[AuthenticationService, Depends(get_authentication_service)],
+) -> JSONResponse:
+    """Forgot password endpoint — resets password for the given email."""
+    user: UserResponse = service.forgot_password(payload)
+    return success_response(
+        message="Password has been reset successfully. You can now login with your new password.",
+        data=user.model_dump(mode="json"),
+        status_code=status.HTTP_200_OK,
+    )
+
+
+@router.post(
+    "/send-otp",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Dispatch 6-digit OTP code to Indian mobile number (+91)",
+    description="Generates short-lived 6-digit OTP code and dispatches via SMS.",
+)
+def send_otp(
+    payload: SendOTPRequest,
+    service: Annotated[AuthenticationService, Depends(get_authentication_service)],
+) -> JSONResponse:
+    """Send OTP endpoint — dispatches 6-digit OTP code."""
+    res: OTPResponse = service.send_otp(payload)
+    return success_response(
+        message=res.message,
+        data=res.model_dump(mode="json"),
+        status_code=status.HTTP_200_OK,
+    )
+
+
+@router.post(
+    "/verify-otp",
+    status_code=status.HTTP_200_OK,
+    response_model=None,
+    summary="Verify 6-digit OTP code and obtain JWT authentication tokens",
+    description="Authenticates mobile subscriber using 6-digit OTP code.",
+)
+def verify_otp(
+    payload: VerifyOTPRequest,
+    service: Annotated[AuthenticationService, Depends(get_authentication_service)],
+) -> JSONResponse:
+    """Verify OTP endpoint — validates 6-digit OTP and returns JWT tokens."""
+    tokens: TokenResponse = service.verify_otp(payload)
+    return success_response(
+        message="Mobile OTP Authentication Successful.",
+        data=tokens.model_dump(mode="json"),
+        status_code=status.HTTP_200_OK,
+    )
+
+

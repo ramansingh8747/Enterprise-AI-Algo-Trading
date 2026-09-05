@@ -12,6 +12,10 @@ vi.mock('@/services/api/paperPortfolioApi', () => ({
     getPortfolio: vi.fn(),
     getPositions: vi.fn(),
     getSummary: vi.fn(),
+    getAllPositions: vi.fn(),
+    getAllSummary: vi.fn(),
+    getValuation: vi.fn().mockResolvedValue(null),
+    resetPortfolio: vi.fn().mockResolvedValue({}),
   },
 }));
 
@@ -63,12 +67,16 @@ const mockSummary = {
 describe('Phase 25 — Frontend Paper Portfolio UI Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (paperPortfolioApi.getAllPositions as any).mockResolvedValue(mockPositions);
+    (paperPortfolioApi.getAllSummary as any).mockResolvedValue(mockSummary);
   });
 
   it('1. Loads and renders server-managed paper portfolio list, positions, and summary metrics', async () => {
     (paperPortfolioApi.listPortfolios as any).mockResolvedValue(mockPortfolios);
     (paperPortfolioApi.getPositions as any).mockResolvedValue(mockPositions);
     (paperPortfolioApi.getSummary as any).mockResolvedValue(mockSummary);
+    (paperPortfolioApi.getAllPositions as any).mockResolvedValue(mockPositions);
+    (paperPortfolioApi.getAllSummary as any).mockResolvedValue(mockSummary);
 
     render(
       <MemoryRouter>

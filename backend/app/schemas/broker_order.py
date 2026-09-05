@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -110,4 +111,102 @@ class BrokerOrderActionResultResponse(BaseModel):
         return cls(
             order_id=domain_result.order_id,
             success=domain_result.success,
+        )
+
+
+class BrokerOrderLedgerResponse(BaseModel):
+    """Persisted application-owned broker order lifecycle state."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    broker_order_id: str
+    symbol: str
+    exchange: Optional[str] = None
+    side: str
+    quantity: Decimal
+    filled_quantity: Decimal
+    average_fill_price: Optional[Decimal] = None
+    order_type: Optional[str] = None
+    product: Optional[str] = None
+    variety: Optional[str] = None
+    price: Optional[Decimal] = None
+    trigger_price: Optional[Decimal] = None
+    status: str
+    strategy_instance_id: Optional[str] = None
+    signal_id: Optional[str] = None
+    last_broker_sync_at: datetime
+    broker_created_at: Optional[datetime] = None
+    broker_updated_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_record(cls, record) -> "BrokerOrderLedgerResponse":
+        return cls(
+            id=str(record.id),
+            broker_order_id=record.broker_order_id,
+            symbol=record.symbol, exchange=record.exchange, side=record.side,
+            quantity=record.quantity, filled_quantity=record.filled_quantity,
+            average_fill_price=record.average_fill_price, order_type=record.order_type,
+            product=record.product, variety=record.variety, price=record.price,
+            trigger_price=record.trigger_price, status=record.status,
+            strategy_instance_id=str(record.strategy_instance_id) if record.strategy_instance_id else None,
+            signal_id=str(record.signal_id) if record.signal_id else None,
+            last_broker_sync_at=record.last_broker_sync_at, broker_created_at=record.broker_created_at,
+            broker_updated_at=record.broker_updated_at, created_at=record.created_at, updated_at=record.updated_at,
+        )
+
+class TradingExecutionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    execution_mode: str
+    external_execution_id: str
+    broker_order_record_id: Optional[str] = None
+    strategy_instance_id: Optional[str] = None
+    signal_id: Optional[str] = None
+    symbol: str
+    side: str
+    quantity: Decimal
+    price: Decimal
+    executed_at: datetime
+
+    @classmethod
+    def from_record(cls, record) -> "TradingExecutionResponse":
+        return cls(
+            id=str(record.id), execution_mode=record.execution_mode,
+            external_execution_id=record.external_execution_id,
+            broker_order_record_id=str(record.broker_order_record_id) if record.broker_order_record_id else None,
+            strategy_instance_id=str(record.strategy_instance_id) if record.strategy_instance_id else None,
+            signal_id=str(record.signal_id) if record.signal_id else None,
+            symbol=record.symbol, side=record.side, quantity=record.quantity,
+            price=record.price, executed_at=record.executed_at,
+        )
+
+
+class TradingPositionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    symbol: str
+    quantity: Decimal
+    average_price: Decimal
+    realized_pnl: Decimal
+    last_price: Optional[Decimal] = None
+    market_value: Decimal = Decimal("0")
+    unrealized_pnl: Decimal = Decimal("0")
+    valuation_at: Optional[datetime] = None
+    strategy_instance_id: Optional[str] = None
+    last_execution_at: Optional[datetime] = None
+    updated_at: datetime
+
+    @classmethod
+    def from_record(cls, record) -> "TradingPositionResponse":
+        return cls(
+            id=str(record.id), symbol=record.symbol, quantity=record.quantity,
+            average_price=record.average_price, realized_pnl=record.realized_pnl,
+            last_price=record.last_price, market_value=record.market_value,
+            unrealized_pnl=record.unrealized_pnl, valuation_at=record.valuation_at,
+            strategy_instance_id=str(record.strategy_instance_id) if record.strategy_instance_id else None,
+            last_execution_at=record.last_execution_at, updated_at=record.updated_at,
         )

@@ -343,3 +343,42 @@ async def test_15_event_bus_and_connection_manager_integration():
     consumed = await sub.consume()
     assert consumed.payload["status"] == "COMPLETED"
     await sub.close()
+
+
+
+@pytest.mark.asyncio
+async def test_16_manual_paper_cycle_is_paper_only_and_returns_execution_summary():
+    inst = MockStrategyInstance(uuid.uuid4(), uuid.uuid4(), status="RUNNING", mode="PAPER")
+    repo = MockStrategyRepository([inst])
+    runner = MockRunner()
+    scheduler = StrategySchedulerService(
+        strategy_repository=repo,
+        strategy_runner=runner,
+    )
+
+    async def fake_execute_instance(instance, instance_id, mode):
+        assert instance is inst
+        assert mode == "PAPER"
+        return type("PaperOrder", (), {"order_id": "PAPER-TEST-1", "status": "COMPLETE"})()
+
+    scheduler._execute_instance_safely = fake_execute_instance
+
+    result = await scheduler.run_instance_once(inst)
+
+    assert result["status"] == "COMPLETED"
+    assert result["mode"] == "PAPER"
+    assert result["signals_count"] == 1
+    assert result["order_id"] == "PAPER-TEST-1"
+    assert result["order_status"] == "COMPLETE"
+
+
+@pytest.mark.asyncio
+async def test_17_manual_paper_cycle_rejects_live_instance():
+    inst = MockStrategyInstance(uuid.uuid4(), uuid.uuid4(), status="RUNNING", mode="LIVE")
+    scheduler = StrategySchedulerService(
+        strategy_repository=MockStrategyRepository([inst]),
+        strategy_runner=MockRunner(),
+    )
+
+    with pytest.raises(ValueError, match="PAPER mode"):
+        await scheduler.run_instance_once(inst)

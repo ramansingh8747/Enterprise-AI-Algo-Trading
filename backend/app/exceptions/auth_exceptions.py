@@ -3,11 +3,11 @@ from app.exceptions.base_exception import BaseAppException
 
 
 class InvalidCredentialsException(BaseAppException):
-    """Raised when email/password combination is invalid."""
+    """Raised when email/password combination or OTP code is invalid."""
 
-    def __init__(self) -> None:
+    def __init__(self, message: str = "Invalid email or password.") -> None:
         super().__init__(
-            message="Invalid email or password.",
+            message=message,
             status_code=HTTPStatus.UNAUTHORIZED.value,
         )
 

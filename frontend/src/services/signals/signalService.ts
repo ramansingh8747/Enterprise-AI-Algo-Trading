@@ -7,10 +7,10 @@ export const createTradingSignal = (equity: Equity): TradingSignal => {
   let action: SignalAction = "HOLD";
   let trend: SignalTrend = "NEUTRAL";
 
-  if (changePercent >= 1) {
+  if (changePercent >= 0.4) {
     action = "BUY";
     trend = "BULLISH";
-  } else if (changePercent <= -1) {
+  } else if (changePercent <= -0.4) {
     action = "SELL";
     trend = "BEARISH";
   }
@@ -39,7 +39,7 @@ export const createTradingSignal = (equity: Equity): TradingSignal => {
     momentum: parseFloat((changePercent * 10).toFixed(1)),
   };
 
-  const strategy = action === "BUY" ? "Momentum Breakout" : action === "SELL" ? "Momentum Reversal" : "Trend Watch";
+  const strategy = equity.name || (action === "BUY" ? "Momentum Breakout" : action === "SELL" ? "Momentum Reversal" : "Trend Watch");
 
   return {
     symbol: equity.symbol,

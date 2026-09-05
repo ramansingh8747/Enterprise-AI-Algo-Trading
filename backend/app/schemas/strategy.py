@@ -75,6 +75,22 @@ class StrategyDefinitionUpdateRequest(BaseModel):
     )
 
 
+class BulkStrategyConfigUpdateRequest(BaseModel):
+    """Payload to bulk update budget & risk configuration across all strategies."""
+
+    morning_scalper_budget_inr: Optional[float] = Field(default=None, ge=100.0, le=500000.0)
+    hero_zero_budget_inr: Optional[float] = Field(default=None, ge=100.0, le=50000.0)
+    full_day_equity_budget_inr: Optional[float] = Field(default=None, ge=500.0, le=5000000.0)
+    risk_per_trade_inr: Optional[float] = Field(default=None, ge=50.0, le=50000.0)
+    position_sizing_mode: Optional[str] = None
+    capital: Optional[float] = None
+    auto_pilot: Optional[bool] = None
+    min_holding_seconds: Optional[int] = None
+    confirm_volume_spike: Optional[bool] = None
+    enforce_market_sentiment: Optional[bool] = None
+
+
+
 class StrategyDefinitionResponse(BaseModel):
     """API response model for a StrategyDefinition record."""
 
@@ -137,7 +153,7 @@ class StrategyInstanceResponse(BaseModel):
 
 
 class StrategySignalResponse(BaseModel):
-    """API response model for a StrategySignal (read-only history).
+    """API response model for a StrategySignal.
 
     quantity and price are Decimal-typed and serialize as fixed-precision
     strings to preserve financial accuracy across JSON transport.
@@ -147,14 +163,53 @@ class StrategySignalResponse(BaseModel):
     strategy_instance_id: UUID
     symbol: str
     side: str
-    quantity: Decimal = Field(description="Executed quantity (Decimal precision).")
+    quantity: Decimal = Field(description="Signal quantity.")
+    suggested_quantity: Optional[Decimal] = Field(default=None, description="Suggested strategy quantity.")
+    actual_quantity: Optional[Decimal] = Field(default=None, description="Actual user approved quantity.")
     order_type: str
     price: Optional[Decimal] = Field(
         default=None,
-        description="Limit price if applicable (Decimal precision). Null for MARKET orders.",
+        description="Entry price if applicable (Decimal precision).",
     )
+    stop_loss: Optional[Decimal] = Field(default=None, description="Calculated stop loss price.")
+    target: Optional[Decimal] = Field(default=None, description="Calculated take profit target price.")
+    risk_reward: Optional[str] = Field(default=None, description="Risk to reward ratio.")
+    reason: Optional[str] = Field(default=None, description="Strategy rationale.")
+    indicators_json: Optional[str] = Field(default=None, description="Technical indicator snapshot.")
+    executed_order_id: Optional[str] = Field(default=None, description="Associated executed order ID.")
+    actioned_at: Optional[datetime] = Field(default=None, description="Timestamp when signal was actioned.")
     signal_fingerprint: str
     status: str
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SignalApprovalRequest(BaseModel):
+    """Request payload for manual user approval of a proposed signal."""
+
+    actual_quantity: Decimal = Field(..., gt=0, description="Actual quantity confirmed by user.")
+    execution_mode: Optional[str] = Field(default="PAPER", description="Execution mode: PAPER or LIVE.")
+    custom_stop_loss: Optional[Decimal] = Field(default=None, description="Optional overridden Stop Loss.")
+    custom_target: Optional[Decimal] = Field(default=None, description="Optional overridden Target.")
+
+
+class SignalApprovalResponse(BaseModel):
+    """Response returned upon user approval and placement of manual order."""
+
+    signal_id: str
+    status: str
+    order_id: str
+    actual_quantity: str
+    side: str
+    symbol: str
+    execution_mode: str
+
+
+class SignalIgnoreResponse(BaseModel):
+    """Response returned upon user dismissing/ignoring a signal."""
+
+    signal_id: str
+    status: str
+    symbol: str
+    side: str

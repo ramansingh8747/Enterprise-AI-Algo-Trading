@@ -21,6 +21,28 @@ async def websocket_endpoint(
                 topic = data.get("topic")
                 if topic:
                     await manager.subscribe(websocket, current_user.id, topic)
+                    if topic.startswith("market:") and hasattr(websocket.app.state, "live_market_data_manager"):
+                        symbol = topic.split(":", 1)[1].strip().upper()
+                        if symbol:
+                            try:
+                                websocket.app.state.live_market_data_manager.subscribe_symbol(
+                                    current_user.id, symbol
+                                )
+                            except Exception:
+                                pass
+            elif "type" in data and data["type"] == "unsubscribe":
+                topic = data.get("topic")
+                if topic:
+                    await manager.unsubscribe(websocket, current_user.id, topic)
+                    if topic.startswith("market:") and hasattr(websocket.app.state, "live_market_data_manager"):
+                        symbol = topic.split(":", 1)[1].strip().upper()
+                        if symbol:
+                            try:
+                                websocket.app.state.live_market_data_manager.unsubscribe_symbol(
+                                    current_user.id, symbol
+                                )
+                            except Exception:
+                                pass
             elif "type" in data and data["type"] == "ping":
                 await websocket.send_json({"type": "pong"})
     except WebSocketDisconnect:

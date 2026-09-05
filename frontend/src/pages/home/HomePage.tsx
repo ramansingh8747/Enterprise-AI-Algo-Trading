@@ -120,22 +120,43 @@ export default function HomePage() {
               </button>
             </>
           ) : (
-            <button
-              onClick={handleLogin}
-              style={{
-                padding: '0.55rem 1.2rem',
-                borderRadius: '0.5rem',
-                background: 'transparent',
-                color: '#f8fafc',
-                border: '1px solid #334155',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-            >
-              Login
-            </button>
+            <>
+              <button
+                onClick={() => navigate(ROUTES.LOGIN)}
+                style={{
+                  padding: '0.55rem 1.15rem',
+                  borderRadius: '0.5rem',
+                  background: 'rgba(30, 41, 59, 0.6)',
+                  color: '#f8fafc',
+                  border: '1px solid #334155',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                Trader Login
+              </button>
+              <button
+                onClick={() => navigate(ROUTES.ADMIN_LOGIN)}
+                style={{
+                  padding: '0.55rem 1.15rem',
+                  borderRadius: '0.5rem',
+                  background: 'rgba(217, 119, 6, 0.12)',
+                  color: '#fde68a',
+                  border: '1px solid rgba(245, 158, 11, 0.4)',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                }}
+              >
+                <span style={{ fontSize: '0.8rem' }}>🛡️</span> Admin Login
+              </button>
+            </>
           )}
 
           <button

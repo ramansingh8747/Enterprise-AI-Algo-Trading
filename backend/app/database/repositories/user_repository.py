@@ -37,14 +37,24 @@ class UserRepository(BaseRepository[User]):
     def get_by_id(self, user_id: uuid.UUID) -> Optional[User]:
         """
         Retrieve a user by their UUID primary key.
-
-        Args:
-            user_id: The UUID of the user.
-
-        Returns:
-            The matching User ORM instance, or None if not found.
         """
         return self.db.get(User, user_id)
+
+    def get_by_username(self, username: str) -> Optional[User]:
+        """
+        Retrieve a user by username.
+        """
+        return self.db.scalar(
+            select(User).where(User.username == username.lower())
+        )
+
+    def get_by_phone_number(self, phone_number: str) -> Optional[User]:
+        """
+        Retrieve a user by mobile number.
+        """
+        return self.db.scalar(
+            select(User).where(User.phone_number == phone_number.strip())
+        )
 
     def exists_by_email(self, email: str) -> bool:
         """

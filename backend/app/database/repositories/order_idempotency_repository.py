@@ -142,3 +142,30 @@ class OrderIdempotencyRepository(BaseRepository[OrderIdempotencyRecord]):
                 status_code=500,
                 details=str(e),
             )
+
+
+    def mark_unknown(
+        self,
+        record_id: UUID,
+        response_payload: str,
+    ) -> OrderIdempotencyRecord:
+        """Mark an order attempt UNKNOWN when broker outcome cannot be determined."""
+        record = self.get_by_id(record_id)
+        if not record:
+            raise BaseAppException(message="Idempotency record not found.", status_code=404)
+
+        record.status = "UNKNOWN"
+        record.response_payload = response_payload
+        try:
+            self.db.add(record)
+            self.db.commit()
+            self.db.refresh(record)
+            return record
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            logger.exception("Error marking OrderIdempotencyRecord as unknown")
+            raise BaseAppException(
+                message="Could not update idempotency record status.",
+                status_code=500,
+                details=str(e),
+            )

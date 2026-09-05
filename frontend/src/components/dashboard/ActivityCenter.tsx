@@ -6,7 +6,21 @@ interface ActivityCenterProps {
 }
 
 export const ActivityCenter: React.FC<ActivityCenterProps> = ({ orders }) => {
-  const recentActivities = orders.slice(0, 5);
+  // Deduplicate orders strictly by ID / order_id to prevent any duplicate rendering in timeline
+  const uniqueOrders = React.useMemo(() => {
+    const seen = new Set<string>();
+    const list: PaperOrder[] = [];
+    for (const order of orders) {
+      const key = order.id || order.order_id || `${order.symbol}-${order.timestamp}-${order.quantity}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        list.push(order);
+      }
+    }
+    return list;
+  }, [orders]);
+
+  const recentActivities = uniqueOrders.slice(0, 5);
 
   return (
     <section style={{
@@ -38,9 +52,10 @@ export const ActivityCenter: React.FC<ActivityCenterProps> = ({ orders }) => {
           {recentActivities.map((order, idx) => {
             const isBuy = order.side === 'BUY';
             const isCancelled = order.status === 'CANCELLED';
+            const orderIdShort = (order.order_id || order.id || '').substring(0, 8);
 
             return (
-              <div key={order.id || idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', fontSize: '0.825rem' }}>
+              <div key={order.id || order.order_id || idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', fontSize: '0.825rem' }}>
                 <div style={{
                   width: '32px',
                   height: '32px',
@@ -70,6 +85,11 @@ export const ActivityCenter: React.FC<ActivityCenterProps> = ({ orders }) => {
                       }}>
                         {order.side}
                       </span>
+                      {orderIdShort && (
+                        <span style={{ fontSize: '0.65rem', color: '#64748b', fontFamily: 'monospace' }}>
+                          #{orderIdShort}
+                        </span>
+                      )}
                     </div>
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.15rem', display: 'block' }}>
                       {order.quantity} shares @ ₹{order.price.toFixed(2)}
@@ -77,11 +97,11 @@ export const ActivityCenter: React.FC<ActivityCenterProps> = ({ orders }) => {
                   </div>
 
                   <div style={{ textAlign: 'right' }}>
-                    <strong style={{ fontSize: '0.85rem', color: '#38bdf8', display: 'block' }}>
+                    <strong style={{ fontSize: '0.85rem', color: '#38bdf8', display: 'block', fontVariantNumeric: 'tabular-nums' }}>
                       ₹{(order.quantity * order.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </strong>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                      {new Date(order.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <span style={{ fontSize: '0.7rem', color: '#64748b', fontVariantNumeric: 'tabular-nums' }}>
+                      {new Date(order.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
                   </div>
                 </div>

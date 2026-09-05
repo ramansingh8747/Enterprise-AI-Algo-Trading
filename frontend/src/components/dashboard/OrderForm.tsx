@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { validatePaperOrderRisk } from "@/services/paperTrading/riskManagementService";
-import { getDefaultRiskLimits } from "@/services/paperTrading/riskManagementService";
 import { brokerOrdersApi } from "@/services/api/brokerOrdersApi";
+import { paperOrdersApi } from "@/services/api/paperOrdersApi";
 import { BrokerOrderCreateRequest, BrokerOrderResponse } from "@/types/brokerOrder";
+import { getMarketSessionStatus } from "@/utils/marketTiming";
 
 export type OrderSide = "BUY" | "SELL";
 export type OrderType = "MARKET" | "LIMIT";
@@ -11,6 +11,7 @@ export type ExecutionMode = "PAPER" | "LIVE";
 
 export interface PaperOrder {
   id: string;
+  order_id?: string;
   symbol: string;
   side: OrderSide;
   orderType: OrderType;
@@ -21,10 +22,9 @@ export interface PaperOrder {
   mode: "PAPER";
   createdAt?: string;
   productType?: ProductType | string;
-  stopLoss?: number;
-  targetPrice?: number;
+  broker_id?: string | null;
+  paper_portfolio_id?: string | null;
 }
-
 export interface OrderFormProps {
   initialSymbol?: string;
   initialSide?: OrderSide;
@@ -52,8 +52,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   selectedBrokerId = "",
   selectedBrokerName = "Selected Broker",
   hasActiveSession = false,
-  currentExposure = 0,
-  dailyPnl = 0,
+  currentExposure: _currentExposure = 0,
+  dailyPnl: _dailyPnl = 0,
   onClose,
   onOrderCreated,
   onPaperOrderCreated,
@@ -95,46 +95,27 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     if (isLimitOrder) {
       return Number(price) || 0;
     }
-    return initialPrice > 0 ? initialPrice : Number(price) || 1000;
+    return initialPrice > 0 ? initialPrice : Number(price) || 0;
   }, [isLimitOrder, price, initialPrice]);
 
   const estimatedValue = useMemo(() => {
     return (quantity || 0) * (numericPrice || 0);
   }, [quantity, numericPrice]);
 
-  const [riskValidation, setRiskValidation] = useState(validatePaperOrderRisk(
-    initialSide, 1, numericPrice, 0, 0, paperBalance, currentExposure, dailyPnl, getDefaultRiskLimits()
-  ));
 
-  useEffect(() => {
-    if (executionMode === "PAPER") {
-      const val = validatePaperOrderRisk(
-        side,
-        quantity,
-        numericPrice,
-        Number(stopLoss) || 0,
-        Number(targetPrice) || 0,
-        paperBalance,
-        currentExposure,
-        dailyPnl,
-        getDefaultRiskLimits()
-      );
-      setRiskValidation(val);
-    } else {
-      // In live mode, basic client validation
-      setRiskValidation({
-        allowed: quantity > 0 && symbol.trim().length > 0 && (!isLimitOrder || Number(price) > 0),
-        errors: quantity <= 0 ? ["Quantity must be greater than zero."] : [],
-        warnings: [],
-        riskRewardRatio: 0,
-        orderValue: estimatedValue,
-        stopLossRisk: 0,
-      });
-    }
-  }, [executionMode, side, quantity, numericPrice, stopLoss, targetPrice, paperBalance, currentExposure, dailyPnl, symbol, isLimitOrder, price, estimatedValue]);
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    const session = getMarketSessionStatus();
+    if (!session.isOpen && side === "BUY") {
+      setError(`Trading Blocked: Market is currently closed (${session.statusText}). NSE trading hours are Monday to Friday 09:15 AM to 03:15 PM IST.`);
+      return;
+    }
+    if (!session.canExit && side === "SELL") {
+      setError(`Trading Blocked: Market is closed (${session.statusText}). Position exits are permitted during active sessions only.`);
+      return;
+    }
 
     if (quantity <= 0) {
       setError("Please enter a valid positive quantity.");
@@ -147,8 +128,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     }
 
     if (executionMode === "PAPER") {
-      if (!riskValidation.allowed) {
-        setError(riskValidation.errors.join(' '));
+      if (numericPrice <= 0) {
+        setError("A valid market price is required for PAPER execution.");
         return;
       }
       executePaperOrder();
@@ -174,29 +155,47 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     setError("");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const paperOrder: PaperOrder = {
-        id: `PAPER-${Date.now()}`,
-        symbol: symbol.trim().toUpperCase() || "NIFTY50",
+      const res = await paperOrdersApi.createOrder({
+        symbol: symbol.trim().toUpperCase(),
         side,
-        orderType,
-        quantity,
-        price: numericPrice,
-        status: "EXECUTED",
-        timestamp: new Date().toISOString(),
-        mode: "PAPER",
-        createdAt: new Date().toISOString(),
-        productType,
-        stopLoss: Number(stopLoss) || undefined,
-        targetPrice: Number(targetPrice) || undefined,
-      };
+        quantity: String(quantity),
+        order_type: orderType,
+        price: String(numericPrice),
+        broker_id: selectedBrokerId || null,
+      });
 
-      onOrderCreated?.(paperOrder);
-      onPaperOrderCreated?.(paperOrder);
+      const uiOrder: PaperOrder = {
+        id: res.id,
+        order_id: res.order_id,
+        symbol: res.symbol,
+        side: res.side,
+        orderType,
+        quantity: Number(res.quantity),
+        price: Number(res.price),
+        status: "PAPER_EXECUTED",
+        timestamp: res.executed_at,
+        mode: "PAPER",
+        createdAt: res.executed_at,
+        productType,
+        broker_id: res.broker_id,
+        paper_portfolio_id: res.paper_portfolio_id,
+      };
+      if (onPaperOrderCreated) {
+        onPaperOrderCreated(uiOrder);
+      } else if (onOrderCreated) {
+        onOrderCreated(uiOrder);
+      }
       onClose();
-    } catch {
-      setError("Unable to create paper order.");
+    } catch (err: any) {
+      if (err.status === 401) {
+        setError("Authentication required. Please log in again.");
+      } else if (err.status === 403) {
+        setError("Paper order blocked by server-side authorization or risk controls.");
+      } else if (err.status === 422 || err.status === 400) {
+        setError(err.message || "Paper order rejected by server-side validation.");
+      } else {
+        setError(err.message || "Unable to create paper order.");
+      }
     } finally {
       setLoading(false);
     }
@@ -366,7 +365,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             gap: '0.5rem',
           }}>
             <span>●</span>
-            <span><strong>PAPER TRADING ONLY:</strong> Simulated execution in local sandbox. No real money at risk.</span>
+            <span><strong>PAPER TRADING:</strong> Simulated execution with real market timing constraints.</span>
           </div>
         ) : (
           <div style={{
@@ -384,6 +383,30 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             <span><strong>LIVE BROKER ORDER:</strong> Orders will be submitted via live API to backend provider.</span>
           </div>
         )}
+
+        {/* Market Timing Warning Banner */}
+        {(() => {
+          const session = getMarketSessionStatus();
+          if (!session.isOpen) {
+            return (
+              <div style={{
+                padding: '0.65rem 0.85rem',
+                borderRadius: '0.5rem',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                fontSize: '0.75rem',
+                color: '#fca5a5',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}>
+                <span>🛑</span>
+                <span><strong>MARKET IS CLOSED:</strong> {session.statusText}. New orders are blocked outside 09:15 AM - 03:15 PM IST.</span>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* Live Success Banner */}
         {liveSuccessOrder && (

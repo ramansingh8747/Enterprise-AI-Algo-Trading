@@ -27,6 +27,9 @@ export interface PaperPosition {
   cost_basis: string;
   realized_pnl: string;
   unrealized_pnl: string;
+  last_price?: string | null;
+  market_value?: string;
+  valuation_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +42,10 @@ export interface PaperPortfolioSummary {
   total_unrealized_pnl: string;
   total_pnl: string;
   position_count: number;
+  today_realized_pnl?: string;
+  today_unrealized_pnl?: string;
+  today_total_pnl?: string;
+  today_trades_count?: number;
   updated_at: string;
 }
 

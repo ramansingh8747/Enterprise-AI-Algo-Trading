@@ -27,3 +27,9 @@ class IdempotencyConflictException(IdempotencyException):
         details: Optional[Any] = None,
     ) -> None:
         super().__init__(message=message, status_code=409, details=details)
+
+
+class IdempotencyUnknownOutcomeException(IdempotencyException):
+    """Broker call timed out or otherwise has an unknown execution outcome; reconciliation is required."""
+    def __init__(self, message: str = "Broker execution outcome is unknown. Reconcile broker state before retrying."):
+        super().__init__(message=message)

@@ -3,16 +3,34 @@ import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/constants/routes';
 import { MarketIndexCard } from '@/components/dashboard/MarketIndexCard';
 import { WatchlistEquityRow } from '@/components/dashboard/WatchlistEquityRow';
+import { MarketChartWidget } from '@/components/dashboard/MarketChartWidget';
 import { OrderForm, PaperOrder } from '@/components/dashboard/OrderForm';
 import { Equity, MarketIndex } from '@/types/market';
 import { initialEquities, initialIndices } from '@/data/marketData';
 import { createTradingSignal } from '@/services/signals/signalService';
 import { getWatchlistSymbols } from '@/services/paperTrading/watchlistWorkspaceService';
 import { watchlistApi, ServerWatchlist } from '@/services/api/watchlistApi';
+import { marketApi } from '@/services/api/marketApi';
 import { WatchlistFilter, WatchlistSort } from '@/types/watchlistWorkspace';
+import { getMarketSessionStatus } from '@/utils/marketTiming';
 
 export default function WatchlistPage() {
   const navigate = useNavigate();
+  const [selectedSymbol, setSelectedSymbolState] = useState<string>(() => {
+    try {
+      return localStorage.getItem('watchlist_selected_symbol') || 'NIFTY50';
+    } catch {
+      return 'NIFTY50';
+    }
+  });
+
+  const setSelectedSymbol = (sym: string) => {
+    setSelectedSymbolState(sym);
+    try {
+      localStorage.setItem('watchlist_selected_symbol', sym);
+    } catch {}
+  };
+  const [liveIndices, setLiveIndices] = useState<MarketIndex[]>(initialIndices);
   const [watchlists, setWatchlists] = useState<ServerWatchlist[]>([]);
   const [activeWatchlistId, setActiveWatchlistId] = useState<string | null>(null);
   const [watchlistSymbols, setWatchlistSymbols] = useState<string[]>([]);
@@ -61,7 +79,9 @@ export default function WatchlistPage() {
         setWatchlistSymbols(serverSyms);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to load watchlists from server');
+      if (err.status !== 401 && err.statusCode !== 401) {
+        setErrorMsg(err.message || 'Failed to load watchlists from server');
+      }
       // Fallback to local symbols if unauthenticated or offline
       setWatchlistSymbols(getWatchlistSymbols());
     } finally {
@@ -71,7 +91,40 @@ export default function WatchlistPage() {
 
   useEffect(() => {
     loadServerWatchlists();
+    const interval = setInterval(() => {
+      const session = getMarketSessionStatus();
+      if (session.isOpen || session.canExit) {
+        loadServerWatchlists();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
   }, [loadServerWatchlists]);
+
+  // Real-time live benchmark indices stream (NIFTY 50, BANK NIFTY, SENSEX)
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveIndices = async () => {
+      try {
+        const data = await marketApi.getLiveIndices();
+        if (isMounted && data && Array.isArray(data) && data.length > 0) {
+          setLiveIndices(data);
+        }
+      } catch (err) {
+        console.warn('Live indices fetch note:', err);
+      }
+    };
+    fetchLiveIndices();
+    const interval = setInterval(() => {
+      const session = getMarketSessionStatus();
+      if (session.isOpen || session.canExit) {
+        fetchLiveIndices();
+      }
+    }, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Handle active watchlist change
   const handleSelectWatchlist = (wlId: string) => {
@@ -184,7 +237,20 @@ export default function WatchlistPage() {
     }
   };
 
+  const marketSession = useMemo(() => getMarketSessionStatus(), []);
+
   const handleTrade = (equity: Equity, side: 'BUY' | 'SELL') => {
+    const currentSession = getMarketSessionStatus();
+    if (!currentSession.isOpen && side === 'BUY') {
+      setErrorMsg(`🚫 Trading Blocked: Market is currently closed (${currentSession.statusText}). NSE trading hours are Monday to Friday 09:15 AM to 03:15 PM IST.`);
+      setTimeout(() => setErrorMsg(null), 6000);
+      return;
+    }
+    if (!currentSession.canExit && side === 'SELL') {
+      setErrorMsg(`🚫 Trading Blocked: Market is closed (${currentSession.statusText}). Position exits are permitted during active market hours only.`);
+      setTimeout(() => setErrorMsg(null), 6000);
+      return;
+    }
     setTradeRequest({ equity, side });
   };
 
@@ -221,11 +287,42 @@ export default function WatchlistPage() {
         </div>
       )}
 
+      {/* Error / Validation Notification Banner */}
+      {errorMsg && (
+        <div style={{
+          position: 'fixed',
+          top: '1.25rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          background: 'rgba(239, 68, 68, 0.95)',
+          border: '1px solid #f87171',
+          borderRadius: '0.5rem',
+          padding: '0.85rem 1.5rem',
+          color: '#ffffff',
+          fontSize: '0.875rem',
+          fontWeight: 700,
+          boxShadow: '0 10px 25px -3px rgba(239, 68, 68, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+        }}>
+          <span>⚠️ {errorMsg}</span>
+          <button
+            type="button"
+            onClick={() => setErrorMsg(null)}
+            style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontWeight: 800, fontSize: '1rem' }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
               <h1 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 900, color: '#f8fafc' }}>
                 Market Workspace
               </h1>
@@ -239,6 +336,21 @@ export default function WatchlistPage() {
                 borderRadius: '1rem',
               }}>
                 PAPER MARKET DATA
+              </span>
+              <span style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: marketSession.isOpen ? '#4ade80' : '#f87171',
+                background: marketSession.isOpen ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                border: `1px solid ${marketSession.isOpen ? 'rgba(74, 222, 128, 0.35)' : 'rgba(248, 113, 113, 0.35)'}`,
+                padding: '0.2rem 0.65rem',
+                borderRadius: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+              }}>
+                <span>{marketSession.isOpen ? '🟢' : '🔴'}</span>
+                <span>{marketSession.statusText}</span>
               </span>
               {loading && (
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#38bdf8' }}>
@@ -312,10 +424,32 @@ export default function WatchlistPage() {
             Benchmark Market Indices
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-            {initialIndices.map((idx: MarketIndex) => (
-              <MarketIndexCard key={idx.name} index={idx} />
+            {liveIndices.map((idx: MarketIndex) => (
+              <div
+                key={idx.name}
+                onClick={() => setSelectedSymbol(idx.symbol)}
+                style={{
+                  cursor: 'pointer',
+                  borderRadius: '0.75rem',
+                  border: selectedSymbol === idx.symbol ? '2px solid #38bdf8' : '2px solid transparent',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <MarketIndexCard index={idx} />
+              </div>
             ))}
           </div>
+        </section>
+
+        {/* Live Interactive Market Candlestick & Technical Indicator Chart */}
+        <section>
+          <MarketChartWidget
+            selectedSymbol={selectedSymbol}
+            allEquities={initialEquities}
+            allIndices={liveIndices}
+            onSelectSymbol={setSelectedSymbol}
+            onTrade={handleTrade}
+          />
         </section>
 
         {/* Watchlist KPI Summary Cards */}
@@ -445,21 +579,34 @@ export default function WatchlistPage() {
             </div>
           ) : (
             filteredEquities.map(({ equity, signal, inWatchlist }) => (
-              <WatchlistEquityRow
+              <div
                 key={equity.symbol}
-                equity={equity}
-                signal={signal}
-                isInWatchlist={inWatchlist}
-                onToggleWatchlist={handleToggleWatchlist}
-                onTrade={handleTrade}
-                onViewStrategy={_symbol => navigate(ROUTES.STRATEGY)}
-              />
+                onClick={() => setSelectedSymbol(equity.symbol)}
+                style={{
+                  cursor: 'pointer',
+                  borderRadius: '0.75rem',
+                  outline: selectedSymbol === equity.symbol ? '2px solid #38bdf8' : 'none',
+                  outlineOffset: '2px',
+                }}
+              >
+                <WatchlistEquityRow
+                  equity={equity}
+                  signal={signal}
+                  isInWatchlist={inWatchlist}
+                  onToggleWatchlist={handleToggleWatchlist}
+                  onTrade={(eq, side) => {
+                    setSelectedSymbol(eq.symbol);
+                    handleTrade(eq, side);
+                  }}
+                  onViewStrategy={_symbol => navigate(ROUTES.STRATEGY)}
+                />
+              </div>
             ))
           )}
         </div>
       </main>
 
-      {/* Render OrderForm modal when tradeRequest is active */}
+      {/* Render OrderForm modal when tradeRequest is active (Paper default, Live gated) */}
       {tradeRequest && (
         <OrderForm
           initialSymbol={tradeRequest.equity.symbol}
@@ -468,6 +615,11 @@ export default function WatchlistPage() {
           onClose={() => setTradeRequest(null)}
           onPaperOrderCreated={(order: PaperOrder) => {
             setNotification(`Paper ${order.side} order placed for ${order.symbol} @ ₹${order.price}`);
+            setTradeRequest(null);
+            setTimeout(() => setNotification(null), 4000);
+          }}
+          onLiveOrderCreated={(liveOrder) => {
+            setNotification(`Live order submitted: ${liveOrder.order_id}`);
             setTradeRequest(null);
             setTimeout(() => setNotification(null), 4000);
           }}

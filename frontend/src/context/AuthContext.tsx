@@ -1,13 +1,26 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { UserResponse, LoginRequest } from '@/types/auth';
 import { authApi } from '@/services/api/authApi';
 import { usersApi, UserUpdateRequest, ChangePasswordRequest } from '@/services/api/usersApi';
+import {
+  clearLegacySharedSession,
+  clearSession,
+  getActiveSessionScope,
+  getSessionToken,
+  getSessionUser,
+  getSessionScopeForRole,
+  saveSession,
+  setActiveSessionScope,
+  updateSessionUser,
+} from '@/services/auth/session';
 
 interface AuthContextType {
   user: UserResponse | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
+  login: (credentials: LoginRequest) => Promise<UserResponse>;
+  verifyOtp?: (phone_number: string, otp_code: string, login_type?: 'trader' | 'admin') => Promise<UserResponse>;
   logout: () => void;
   updateProfile: (data: UserUpdateRequest) => Promise<UserResponse>;
   changePassword: (data: ChangePasswordRequest) => Promise<void>;
@@ -19,62 +32,98 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<UserResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
+  let currentPath = '';
+  try {
+    const loc = useLocation();
+    currentPath = loc.pathname;
+  } catch {
+    currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  }
+
   useEffect(() => {
-    const initAuth = async () => {
-      const token = localStorage.getItem('access_token');
-      const storedUser = localStorage.getItem('user_profile');
+    const syncAuthForRoute = async () => {
+      clearLegacySharedSession();
 
-      if (token) {
-        if (storedUser) {
-          try {
-            setUser(JSON.parse(storedUser));
-          } catch (err) {
-            console.warn('Invalid stored user profile', err);
-          }
-        }
+      const scope = (currentPath.startsWith('/admin') || currentPath.startsWith('/kill-switch')) ? 'admin' : 'trader';
+      const token = getSessionToken(scope);
+      const storedUser = getSessionUser(scope);
 
-        try {
-          const userData = await authApi.getMe();
-          setUser(userData);
-          localStorage.setItem('user_profile', JSON.stringify(userData));
-        } catch {
-          // Clear authentication state if session is invalid or expired
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-          localStorage.removeItem('user_profile');
-          setUser(null);
-        }
+      if (!token || !storedUser) {
+        setUser(null);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+
+      setActiveSessionScope(scope);
+      setUser(storedUser);
+
+      try {
+        const userData = await authApi.getMe();
+        const expectedScope = getSessionScopeForRole(userData.role);
+
+        // Never allow a role change to silently reuse the wrong session bucket.
+        if (expectedScope !== scope) {
+          clearSession(scope);
+          setUser(null);
+        } else {
+          setUser(userData);
+          updateSessionUser(scope, userData);
+        }
+      } catch (err: any) {
+        const status = err?.status || err?.response?.status;
+        if (status === 401 || status === 403) {
+          clearSession(scope);
+          setUser(null);
+        } else {
+          console.warn('Backend server temporarily unavailable or network issue during auth sync:', err);
+        }
+      } finally {
+        setLoading(false);
+      }
     };
 
-    initAuth();
-  }, []);
+    void syncAuthForRoute();
+  }, [currentPath]);
 
-  const login = async (credentials: LoginRequest) => {
+  const login = async (credentials: LoginRequest): Promise<UserResponse> => {
     setLoading(true);
     try {
       const response = await authApi.login(credentials);
-      localStorage.setItem('access_token', response.access_token);
-      localStorage.setItem('refresh_token', response.refresh_token);
-      localStorage.setItem('user_profile', JSON.stringify(response.user));
+      const scope = getSessionScopeForRole(response.user.role);
+      saveSession(scope, response.access_token, response.refresh_token, response.user);
       setUser(response.user);
+      return response.user;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyOtp = async (phone_number: string, otp_code: string, login_type?: 'trader' | 'admin'): Promise<UserResponse> => {
+    setLoading(true);
+    try {
+      const response = await authApi.verifyOtp({ phone_number, otp_code, login_type });
+      const scope = getSessionScopeForRole(response.user.role);
+      saveSession(scope, response.access_token, response.refresh_token, response.user);
+      setUser(response.user);
+      return response.user;
     } finally {
       setLoading(false);
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user_profile');
+    const scope = getActiveSessionScope();
+    if (scope) {
+      clearSession(scope);
+    }
     setUser(null);
   };
 
   const updateProfile = async (data: UserUpdateRequest): Promise<UserResponse> => {
     const updatedUser = await usersApi.updateMe(data);
     setUser(updatedUser);
-    localStorage.setItem('user_profile', JSON.stringify(updatedUser));
+    const scope = getActiveSessionScope();
+    if (scope) updateSessionUser(scope, updatedUser);
     return updatedUser;
   };
 
@@ -89,6 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAuthenticated: !!user,
         loading,
         login,
+        verifyOtp,
         logout,
         updateProfile,
         changePassword,

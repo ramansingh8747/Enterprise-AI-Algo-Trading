@@ -15,38 +15,55 @@ export const MarketIndexCard: React.FC<MarketIndexCardProps> = ({ index, onClick
     <div
       onClick={onClick}
       style={{
-        background: '#111b2d',
-        border: '1px solid rgba(148, 163, 184, 0.18)',
+        background: 'linear-gradient(135deg, rgba(17, 27, 45, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%)',
+        border: '1px solid rgba(148, 163, 184, 0.14)',
         borderRadius: '0.85rem',
-        padding: '1.1rem 1.25rem',
+        padding: '1.15rem 1.35rem',
         display: 'flex',
         flexDirection: 'column',
         gap: '0.5rem',
         cursor: onClick ? 'pointer' : 'default',
-        transition: 'transform 0.15s ease, border-color 0.15s ease',
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
+        backdropFilter: 'blur(8px)',
+        transition: 'all 0.18s ease',
       }}
     >
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '2px',
+          background: `linear-gradient(90deg, ${color} 0%, transparent 100%)`,
+        }}
+      />
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#f8fafc' }}>
+        <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '0.02em' }}>
           {index.name}
         </span>
         <span style={{
-          fontSize: '0.7rem',
+          fontSize: '0.72rem',
           fontWeight: 800,
           color,
           background: bgBadge,
-          padding: '0.15rem 0.55rem',
+          border: `1px solid ${isPositive ? 'rgba(74, 222, 128, 0.25)' : 'rgba(248, 113, 113, 0.25)'}`,
+          padding: '0.2rem 0.6rem',
           borderRadius: '1rem',
+          fontVariantNumeric: 'tabular-nums',
         }}>
-          {isPositive ? '▲' : '▼'} {Math.abs(index.changePercent).toFixed(2)}%
+          {isPositive ? '▲ +' : '▼ '}{Math.abs(index.changePercent).toFixed(2)}%
         </span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
-        <span style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f8fafc' }}>
-          ₹{index.value.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginTop: '0.15rem' }}>
+        <span style={{ fontSize: '1.55rem', fontWeight: 900, color: '#f8fafc', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+          ₹{index.value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
-        <span style={{ fontSize: '0.8rem', fontWeight: 700, color }}>
+        <span style={{ fontSize: '0.8rem', fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>
           {isPositive ? '+' : ''}{index.change.toFixed(2)}
         </span>
       </div>

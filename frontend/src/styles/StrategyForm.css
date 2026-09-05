@@ -1,0 +1,120 @@
+.strategy-form {
+  width: min(100%, 680px);
+  margin: 0 auto;
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.strategy-form h2 {
+  margin: 0 0 1.5rem;
+  color: #111827;
+  font-size: 1.5rem;
+}
+
+.strategy-form .form-error {
+  margin-bottom: 1rem;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0.75rem;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.strategy-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.strategy-form label {
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.strategy-form input,
+.strategy-form select,
+.strategy-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+}
+
+.strategy-form textarea {
+  resize: vertical;
+  min-height: 120px;
+  font-family: "Courier New", monospace;
+}
+
+.strategy-form input:focus,
+.strategy-form select:focus,
+.strategy-form textarea:focus {
+  border-color: #2563eb;
+  outline: 3px solid rgba(37, 99, 235, 0.12);
+}
+
+.strategy-form input.error,
+.strategy-form select.error,
+.strategy-form textarea.error {
+  border-color: #dc2626;
+}
+
+.strategy-form .field-error {
+  color: #b91c1c;
+  font-size: 0.8rem;
+}
+
+.strategy-form .form-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1.25rem;
+}
+
+.strategy-form .btn {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.strategy-form .btn-primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.strategy-form .btn-secondary {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.strategy-form .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (max-width: 640px) {
+  .strategy-form {
+    padding: 1rem;
+  }
+
+  .strategy-form .form-actions {
+    flex-direction: column;
+  }
+
+  .strategy-form .form-actions .btn {
+    width: 100%;
+  }
+}

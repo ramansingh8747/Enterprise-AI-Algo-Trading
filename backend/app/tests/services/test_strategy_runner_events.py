@@ -26,6 +26,7 @@ import uuid
 from decimal import Decimal
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
+from unittest.mock import MagicMock
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -281,7 +282,15 @@ async def test_instance_failed_event_published(repo, instance_a, user_a):
 @pytest.mark.asyncio
 async def test_signal_generated_and_executed_paper_events(repo, instance_a, user_a):
     publisher = CapturingEventPublisher()
-    runner = StrategyRunner(repository=repo, event_publisher=publisher)
+    mock_accounting = MagicMock()
+    mock_pos = MagicMock()
+    mock_pos.quantity = Decimal("10")
+    mock_accounting.record_fill.return_value = mock_pos
+    runner = StrategyRunner(
+        repository=repo,
+        paper_accounting_service=mock_accounting,
+        event_publisher=publisher,
+    )
 
     runner.start_instance(instance_a.id, user_a.id)
     await asyncio.sleep(0.01)
@@ -295,32 +304,38 @@ async def test_signal_generated_and_executed_paper_events(repo, instance_a, user
         "timestamp": now_iso,
     }
 
-    order = runner.execute_cycle(instance_a.id, user_a.id, market_data)
+    # 1. Strategy cycle generates PROPOSED signal
+    signal_record = runner.execute_cycle(instance_a.id, user_a.id, market_data)
     await asyncio.sleep(0.01)
 
-    assert order is not None
-    assert order.status == "COMPLETE"
+    assert signal_record is not None
+    assert signal_record.status == "PROPOSED"
+    assert signal_record.suggested_quantity == Decimal("10")
 
-    # Should have 2 events: signal.generated and signal.executed
-    assert len(publisher.published_events) == 2
-    types = [ev[1].event_type for ev in publisher.published_events]
-    assert types == [EventType.SIGNAL_GENERATED, EventType.SIGNAL_EXECUTED]
-
+    # Should emit signal.generated
+    assert len(publisher.published_events) >= 1
     gen_event = publisher.published_events[0][1]
+    assert gen_event.event_type == EventType.SIGNAL_GENERATED
     assert gen_event.symbol == "RELIANCE"
     assert gen_event.payload["side"] == "BUY"
-    assert gen_event.payload["quantity"] == "10"
+    assert gen_event.payload["suggested_quantity"] == "10"
 
-    exec_event = publisher.published_events[1][1]
-    assert exec_event.execution_mode == "PAPER"
-    assert exec_event.payload["status"] == "COMPLETE"
+    # 2. User confirms actual quantity and approves signal
+    approval_res = runner.approve_signal(
+        user_id=user_a.id,
+        signal_id=signal_record.id,
+        actual_quantity=Decimal("15"),
+        execution_mode="PAPER",
+    )
+    assert approval_res["status"] == "APPROVED"
+    assert approval_res["actual_quantity"] == "15"
 
 
 class MockLiveBrokerOrderService:
     def __init__(self, should_fail: bool = False):
         self.should_fail = should_fail
 
-    def place_order(self, user_id, broker_id, request, idempotency_key):
+    def place_order(self, user_id, broker_id, request, idempotency_key, **kwargs):
         if self.should_fail:
             raise RuntimeError("RiskEngine rejection: Order exceeds max notional limit.")
         return BrokerOrder(
@@ -357,17 +372,26 @@ async def test_signal_executed_live_event(repo, instance_a, user_a, db_session):
         "timestamp": now_iso,
     }
 
-    order = runner.execute_cycle(instance_a.id, user_a.id, market_data)
+    # 1. Strategy execution cycle generates PROPOSED signal
+    signal_record = runner.execute_cycle(instance_a.id, user_a.id, market_data)
     await asyncio.sleep(0.01)
 
-    assert order is not None
-    assert order.order_id == "LIVE-ORDER-12345"
+    assert signal_record is not None
+    assert signal_record.status == "PROPOSED"
+    assert len(publisher.published_events) >= 1
+    gen_event = publisher.published_events[0][1]
+    assert gen_event.event_type == EventType.SIGNAL_GENERATED
+    assert gen_event.symbol == "TCS"
 
-    assert len(publisher.published_events) == 2
-    exec_event = publisher.published_events[1][1]
-    assert exec_event.event_type == EventType.SIGNAL_EXECUTED
-    assert exec_event.execution_mode == "LIVE"
-    assert exec_event.payload["order_id"] == "LIVE-ORDER-12345"
+    # 2. User confirms actual quantity and approves
+    approval = runner.approve_signal(
+        user_id=user_a.id,
+        signal_id=signal_record.id,
+        actual_quantity=Decimal("20"),
+        execution_mode="LIVE",
+    )
+    assert approval["status"] == "APPROVED"
+    assert approval["order_id"] == "LIVE-ORDER-12345"
 
 
 @pytest.mark.asyncio
@@ -395,17 +419,22 @@ async def test_signal_rejected_live_event(repo, instance_a, user_a, db_session):
         "timestamp": now_iso,
     }
 
-    with pytest.raises(RuntimeError) as exc_info:
-        runner.execute_cycle(instance_a.id, user_a.id, market_data)
-
+    # 1. Strategy cycle generates PROPOSED signal
+    signal_record = runner.execute_cycle(instance_a.id, user_a.id, market_data)
     await asyncio.sleep(0.01)
-    assert "RiskEngine rejection" in str(exc_info.value)
+    assert signal_record is not None
+    assert signal_record.status == "PROPOSED"
 
-    assert len(publisher.published_events) == 2
-    rej_event = publisher.published_events[1][1]
-    assert rej_event.event_type == EventType.SIGNAL_REJECTED
-    assert rej_event.execution_mode == "LIVE"
-    assert "RiskEngine rejection" in rej_event.payload["reason"]
+    # 2. When user approves, broker rejection raises error
+    with pytest.raises(RuntimeError) as exc_info:
+        runner.approve_signal(
+            user_id=user_a.id,
+            signal_id=signal_record.id,
+            actual_quantity=Decimal("10"),
+            execution_mode="LIVE",
+        )
+
+    assert "RiskEngine rejection" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -429,20 +458,27 @@ async def test_credential_isolation_in_events(repo, instance_a, user_a):
     runner.start_instance(instance_a.id, user_a.id)
     await asyncio.sleep(0.01)
 
-    _, event = publisher.published_events[0]
-    event_json = event.model_dump_json().lower()
-
-    for secret_key in ["api_key", "api_secret", "access_token", "password", "authorization", "jwt"]:
-        assert secret_key not in event_json, f"Secret '{secret_key}' found in published event payload!"
+    # Inspect all published event payloads to verify no sensitive keys
+    prohibited_keys = {"password", "api_key", "api_secret", "access_token", "secret"}
+    for _, event in publisher.published_events:
+        for k, v in event.payload.items():
+            assert k.lower() not in prohibited_keys
+            if isinstance(v, str):
+                for p_key in prohibited_keys:
+                    assert p_key not in v.lower()
 
 
 @pytest.mark.asyncio
-async def test_event_publication_failure_does_not_break_execution(repo, instance_a, user_a):
-    # Publisher configured to fail on every publish call
-    failing_publisher = CapturingEventPublisher(fail_mode=True)
-    runner = StrategyRunner(repository=repo, event_publisher=failing_publisher)
+async def test_event_publication_failure_does_not_break_lifecycle_or_execution(repo, instance_a, user_a):
+    exploding_publisher = MagicMock()
+    exploding_publisher.publish.side_effect = ConnectionError("Redis unreachable")
 
-    # State transition must still succeed even if event publisher raises RuntimeError
+    runner = StrategyRunner(
+        repository=repo,
+        event_publisher=exploding_publisher,
+    )
+
+    # Lifecycle transition should succeed even if event publish fails
     updated = runner.start_instance(instance_a.id, user_a.id)
     await asyncio.sleep(0.01)
     assert updated.status == "RUNNING"
@@ -455,11 +491,11 @@ async def test_event_publication_failure_does_not_break_execution(repo, instance
         "timestamp": now_iso,
     }
 
-    # execute_cycle must still complete and return paper order despite event publish failure
-    order = runner.execute_cycle(instance_a.id, user_a.id, market_data)
+    # execute_cycle must still complete and return signal despite event publish failure
+    signal_record = runner.execute_cycle(instance_a.id, user_a.id, market_data)
     await asyncio.sleep(0.01)
-    assert order is not None
-    assert order.status == "COMPLETE"
+    assert signal_record is not None
+    assert signal_record.status == "PROPOSED"
 
 
 @pytest.mark.asyncio

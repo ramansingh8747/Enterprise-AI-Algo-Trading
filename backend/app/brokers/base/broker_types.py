@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 from decimal import Decimal
 
 class BrokerProfile(BaseModel):
@@ -24,6 +25,16 @@ class BrokerOrder(BaseModel):
     side: str
     quantity: Decimal
     status: str
+    exchange: Optional[str] = None
+    filled_quantity: Decimal = Decimal("0")
+    average_fill_price: Optional[Decimal] = None
+    order_type: Optional[str] = None
+    product: Optional[str] = None
+    variety: Optional[str] = None
+    price: Optional[Decimal] = None
+    trigger_price: Optional[Decimal] = None
+    broker_created_at: Optional[datetime] = None
+    broker_updated_at: Optional[datetime] = None
 
 class BrokerOrderActionResult(BaseModel):
     order_id: str

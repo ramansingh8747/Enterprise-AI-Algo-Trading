@@ -87,15 +87,19 @@ class AlertRepository:
         type: str = "SYSTEM",
         severity: str = "INFO",
         route: Optional[str] = None,
+        signal_id: Optional[uuid.UUID] = None,
+        data_json: Optional[str] = None,
     ) -> Alert:
         """Create new alert for user."""
         alt = Alert(
             id=uuid.uuid4(),
             user_id=user_id,
+            signal_id=signal_id,
             type=type,
             severity=severity,
             title=title.strip(),
             message=message.strip(),
+            data_json=data_json,
             route=route,
             read=False,
         )

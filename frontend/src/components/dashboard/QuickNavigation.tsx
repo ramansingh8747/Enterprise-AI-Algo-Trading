@@ -54,8 +54,8 @@ export default function QuickNavigation({
     <section
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
-        gap: 10,
+        gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+        gap: 12,
       }}
     >
       {items.map((item) => (
@@ -68,28 +68,49 @@ export default function QuickNavigation({
           }}
           style={{
             textAlign: "left",
-            padding: 14,
+            padding: "14px 16px",
             borderRadius: 12,
-            border: "1px solid rgba(148,163,184,.14)",
-            background: "rgba(15,23,42,.7)",
+            border: "1px solid rgba(148, 163, 184, 0.12)",
+            background: "linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.4) 100%)",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
             cursor: "pointer",
+            position: "relative",
+            overflow: "hidden",
+            transition: "all 0.18s ease",
           }}
         >
           <div
             style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: "3px",
+              background: item.color,
+            }}
+          />
+
+          <div
+            style={{
               color: item.color,
-              fontWeight: 850,
-              fontSize: 13,
+              fontWeight: 800,
+              fontSize: 14,
+              letterSpacing: "-0.01em",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
-            {item.label}
+            <span>{item.label}</span>
+            <span style={{ fontSize: 12, opacity: 0.6 }}>→</span>
           </div>
 
           <div
             style={{
-              marginTop: 5,
-              color: "#64748b",
+              marginTop: 4,
+              color: "#94a3b8",
               fontSize: 11,
+              fontWeight: 500,
             }}
           >
             {item.description}

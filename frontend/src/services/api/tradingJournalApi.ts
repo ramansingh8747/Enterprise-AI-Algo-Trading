@@ -21,13 +21,8 @@ export interface TradingJournalEntryCreate {
 export type TradingJournalEntryUpdate = TradingJournalEntryCreate;
 
 class TradingJournalApi extends BaseApi {
-  constructor() {
-    super();
-    this.http.defaults.baseURL += '/trading-journal';
-  }
-
   async createEntry(entry: TradingJournalEntryCreate): Promise<TradingJournalEntry> {
-    return this.handleRequest<TradingJournalEntry>(this.http.post('', entry));
+    return this.handleRequest<TradingJournalEntry>(this.http.post('/trading-journal', entry));
   }
 
   async listEntries(params?: {
@@ -38,20 +33,19 @@ class TradingJournalApi extends BaseApi {
     symbol?: string;
     side?: string;
   }): Promise<TradingJournalEntry[]> {
-    return this.handleRequest<TradingJournalEntry[]>(this.http.get('', { params }));
+    return this.handleRequest<TradingJournalEntry[]>(this.http.get('/trading-journal', { params }));
   }
 
-
   async getEntry(id: string): Promise<TradingJournalEntry> {
-    return this.handleRequest<TradingJournalEntry>(this.http.get(`/${id}`));
+    return this.handleRequest<TradingJournalEntry>(this.http.get(`/trading-journal/${id}`));
   }
 
   async updateEntry(id: string, entry: TradingJournalEntryUpdate): Promise<TradingJournalEntry> {
-    return this.handleRequest<TradingJournalEntry>(this.http.patch(`/${id}`, entry));
+    return this.handleRequest<TradingJournalEntry>(this.http.patch(`/trading-journal/${id}`, entry));
   }
 
   async deleteEntry(id: string): Promise<void> {
-    await this.handleRequest<void>(this.http.delete(`/${id}`));
+    await this.handleRequest<void>(this.http.delete(`/trading-journal/${id}`));
   }
 }
 

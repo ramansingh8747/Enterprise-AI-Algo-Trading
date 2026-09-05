@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional
 from uuid import UUID
 
 from app.services.event_bus.models import Event, EventType
+from app.core.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ class RedisEventTransport:
         self._pubsub: Optional[Any] = None
         self._listen_task: Optional[asyncio.Task] = None
         self._is_connected: bool = False
+        self._reconnect_attempts: int = 0
+        self._max_reconnect_attempts: int = settings.REDIS_RECONNECT_MAX_ATTEMPTS
+        self._reconnect_base_delay: float = settings.REDIS_RECONNECT_BASE_DELAY_SECONDS
 
     @property
     def is_connected(self) -> bool:
@@ -107,27 +111,66 @@ class RedisEventTransport:
             if hasattr(self._client, "pubsub"):
                 self._pubsub = self._client.pubsub()
                 await self._pubsub.subscribe(self.channel)
-                self._listen_task = asyncio.create_task(self._listen_loop())
+                if self._listen_task and not self._listen_task.done():
+                    return
+                self._listen_task = asyncio.create_task(self._listen_loop(), name="redis-event-listener")
                 logger.info("Redis Pub/Sub listener started on channel '%s'", self.channel)
         except Exception as exc:
             logger.warning("Failed to start Redis Pub/Sub listener: %s", exc)
 
     async def _listen_loop(self) -> None:
-        """Background loop reading messages from Redis Pub/Sub."""
-        if not self._pubsub:
-            return
-
-        try:
-            while self._is_connected and self._listen_task and not self._listen_task.cancelled():
+        """Read Redis messages and recover from transient disconnects with backoff."""
+        while self._is_connected and self._listen_task and not self._listen_task.cancelled():
+            if not self._pubsub:
+                if not await self._recover_connection():
+                    break
+            try:
                 msg = await self._pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
                 if msg and msg.get("type") == "message":
-                    raw_data = msg.get("data")
-                    self.process_incoming_message(raw_data)
+                    self.process_incoming_message(msg.get("data"))
                 await asyncio.sleep(0.01)
-        except asyncio.CancelledError:
-            pass
-        except Exception as exc:
-            logger.warning("Redis Pub/Sub listen loop error: %s", exc)
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.warning("Redis Pub/Sub listen error: %s", exc)
+                self._is_connected = False
+                if not await self._recover_connection():
+                    break
+
+    async def _recover_connection(self) -> bool:
+        """Reconnect Redis Pub/Sub with bounded exponential backoff."""
+        if not self.enabled:
+            return False
+        await self._close_pubsub_only()
+        for attempt in range(self._max_reconnect_attempts):
+            if not self._listen_task or self._listen_task.cancelled():
+                return False
+            delay = self._reconnect_base_delay * (2 ** attempt)
+            await asyncio.sleep(delay)
+            try:
+                if self._client is None:
+                    import redis.asyncio as aioredis
+                    self._client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+                await self._client.ping()
+                self._is_connected = True
+                self._reconnect_attempts = attempt + 1
+                self._pubsub = self._client.pubsub()
+                await self._pubsub.subscribe(self.channel)
+                logger.info("Redis Pub/Sub reconnected on attempt %s", attempt + 1)
+                return True
+            except Exception as exc:
+                self._is_connected = False
+                logger.warning("Redis reconnect attempt %s/%s failed: %s", attempt + 1, self._max_reconnect_attempts, exc)
+        return False
+
+    async def _close_pubsub_only(self) -> None:
+        if self._pubsub:
+            try:
+                await self._pubsub.unsubscribe(self.channel)
+                await self._pubsub.close()
+            except Exception:
+                pass
+            self._pubsub = None
 
     def process_incoming_message(self, raw_data: Any) -> Optional[Event]:
         """
@@ -176,13 +219,7 @@ class RedisEventTransport:
                 pass
             self._listen_task = None
 
-        if self._pubsub:
-            try:
-                await self._pubsub.unsubscribe(self.channel)
-                await self._pubsub.close()
-            except Exception:
-                pass
-            self._pubsub = None
+        await self._close_pubsub_only()
 
         if self._client and hasattr(self._client, "close"):
             try:

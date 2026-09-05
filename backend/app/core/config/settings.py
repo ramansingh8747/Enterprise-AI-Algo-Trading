@@ -25,6 +25,33 @@ class Settings(BaseSettings):
     PASSWORD_MIN_LENGTH: int = 8
     CORS_ALLOWED_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 
+    # Trading safety / production readiness defaults. LIVE trading remains disabled by default.
+    LIVE_TRADING_ENABLED: bool = False
+    LIVE_DATA_FEED_ENABLED: bool = False
+    LIVE_DATA_FEED_PROVIDER: str = "zerodha"
+    LIVE_TRADING_MAX_ORDER_VALUE: str = "50000.00"
+    STRATEGY_SCHEDULER_ENABLED: bool = True
+    STRATEGY_SCHEDULER_INTERVAL_SECONDS: float = 5.0
+    BROKER_RECONCILIATION_ENABLED: bool = True
+    BROKER_RECONCILIATION_INTERVAL_SECONDS: int = 30
+    AUDIT_LOG_ENABLED: bool = True
+    REDIS_EVENT_BUS_ENABLED: bool = False
+    REDIS_URL: str = "redis://localhost:6379/0"
+    BROKER_OPERATION_TIMEOUT_SECONDS: int = 15
+    REDIS_RECONNECT_MAX_ATTEMPTS: int = 5
+    REDIS_RECONNECT_BASE_DELAY_SECONDS: float = 1.0
+    PORTFOLIO_VALUATION_REFRESH_INTERVAL_SECONDS: int = 30
+    STRATEGY_UPLOAD_DIR: str = "storage/strategy_uploads"
+    STRATEGY_DEFAULT_COOLDOWN_SECONDS: int = 300
+    ENFORCE_MARKET_HOURS: bool = False
+    MARKET_OPEN_TIME_IST: str = "09:15"
+    MARKET_NEW_ORDER_CUTOFF_IST: str = "15:15"
+    MARKET_CLOSE_TIME_IST: str = "15:30"
+    DB_POOL_SIZE: int = 30
+    DB_MAX_OVERFLOW: int = 50
+    DB_POOL_TIMEOUT: float = 60.0
+    DB_POOL_RECYCLE: int = 1800
+
     @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:

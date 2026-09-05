@@ -152,7 +152,7 @@ export const SignalDetail: React.FC<SignalDetailProps> = ({ signal, onClose, onT
               background: `${actionColor}18`,
               border: `1px solid ${actionColor}40`,
             }}>
-              {signal.action}
+              {signal.action} ({signal.strength}%)
             </span>
 
             <span style={{
@@ -206,7 +206,7 @@ export const SignalDetail: React.FC<SignalDetailProps> = ({ signal, onClose, onT
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
           <div style={{ background: 'rgba(15, 23, 42, 0.75)', padding: '1rem', borderRadius: '0.625rem', border: '1px solid rgba(148, 163, 184, 0.12)' }}>
             <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>ACTION</span>
-            <strong style={{ fontSize: '1.1rem', color: actionColor, fontWeight: 800 }}>{signal.action}</strong>
+            <strong style={{ fontSize: '1.1rem', color: actionColor, fontWeight: 800 }}>{signal.action} ({signal.strength}%)</strong>
           </div>
 
           <div style={{ background: 'rgba(15, 23, 42, 0.75)', padding: '1rem', borderRadius: '0.625rem', border: '1px solid rgba(148, 163, 184, 0.12)' }}>

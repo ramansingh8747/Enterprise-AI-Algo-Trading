@@ -43,7 +43,7 @@ def strategy_runner(mock_strategy_repo, mock_broker_order_service):
 
 
 def test_e2e_paper_strategy_flow_success(strategy_runner, mock_strategy_repo, mock_broker_order_service):
-    """Phase 2 & Phase 3: Tests end-to-end paper strategy execution flow using deterministic strategy fixture."""
+    """Phase 2 & Phase 3: Tests end-to-end paper strategy signal generation and user approval."""
     user_id = uuid.uuid4()
     instance_id = uuid.uuid4()
     broker_id = uuid.uuid4()
@@ -67,11 +67,16 @@ def test_e2e_paper_strategy_flow_success(strategy_runner, mock_strategy_repo, mo
         symbol="TATASTEEL",
         side="BUY",
         quantity=Decimal("10"),
+        suggested_quantity=Decimal("10"),
         order_type="MARKET",
+        price=Decimal("150.50"),
+        stop_loss=Decimal("147.49"),
+        target=Decimal("156.52"),
         signal_fingerprint="canonical_fp_1001",
         status="PROPOSED",
     )
     mock_strategy_repo.create_signal_if_not_exists.return_value = (signal_record, True)
+    mock_strategy_repo.get_signal_by_id.return_value = signal_record
 
     market_data = {
         "symbol": "TATASTEEL",
@@ -80,14 +85,14 @@ def test_e2e_paper_strategy_flow_success(strategy_runner, mock_strategy_repo, mo
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
-    order = strategy_runner.execute_cycle(instance_id, user_id, market_data)
+    # 1. Strategy execution cycle generates PROPOSED signal and NEVER places auto BUY order
+    sig = strategy_runner.execute_cycle(instance_id, user_id, market_data)
 
-    assert order is not None
-    assert order.order_id.startswith("PAPER-")
-    assert order.symbol == "TATASTEEL"
-    assert order.side == "BUY"
-    assert order.status == "COMPLETE"
-    assert signal_record.status == "EXECUTED"
+    assert sig is not None
+    assert sig.status == "PROPOSED"
+    assert sig.suggested_quantity == Decimal("10")
+    assert sig.symbol == "TATASTEEL"
+    assert sig.side == "BUY"
     mock_broker_order_service.place_order.assert_not_called()
 
 
@@ -114,7 +119,11 @@ def test_paper_live_isolation_strict_boundary(strategy_runner, mock_strategy_rep
         symbol="RELIANCE",
         side="BUY",
         quantity=Decimal("5"),
+        suggested_quantity=Decimal("5"),
         order_type="MARKET",
+        price=Decimal("2800.0"),
+        stop_loss=Decimal("2744.0"),
+        target=Decimal("2912.0"),
         signal_fingerprint="fp_iso_1",
         status="PROPOSED",
     )
@@ -130,13 +139,13 @@ def test_paper_live_isolation_strict_boundary(strategy_runner, mock_strategy_rep
     res = strategy_runner.execute_cycle(instance_id, user_id, market_data)
 
     assert res is not None
-    assert res.order_id.startswith("PAPER-")
+    assert res.status == "PROPOSED"
     # Crucial security assertion: place_order MUST NOT be called in PAPER mode!
     mock_broker_order_service.place_order.assert_not_called()
 
 
 def test_risk_engine_rejection_in_live_mode_marks_signal_rejected(strategy_runner, mock_strategy_repo, mock_broker_order_service):
-    """Phase 7: Validates that RiskEngine rejection in LIVE mode sets signal status REJECTED and propagates exception."""
+    """Phase 7: Validates that RiskEngine rejection during manual LIVE approval raises error."""
     user_id = uuid.uuid4()
     instance_id = uuid.uuid4()
     broker_id = uuid.uuid4()
@@ -159,11 +168,14 @@ def test_risk_engine_rejection_in_live_mode_marks_signal_rejected(strategy_runne
         symbol="SBIN",
         side="BUY",
         quantity=Decimal("10000"), # Exceeds risk limit
+        suggested_quantity=Decimal("10000"),
         order_type="MARKET",
+        price=Decimal("800.0"),
         signal_fingerprint="fp_risk_1",
         status="PROPOSED",
     )
     mock_strategy_repo.create_signal_if_not_exists.return_value = (signal_record, True)
+    mock_strategy_repo.get_signal_by_id.return_value = signal_record
 
     # Mock RiskEngine rejection inside BrokerOrderService
     mock_broker_order_service.place_order.side_effect = RiskLimitExceededException("Order quantity exceeds maximum limit.")
@@ -175,11 +187,20 @@ def test_risk_engine_rejection_in_live_mode_marks_signal_rejected(strategy_runne
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
+    # 1. execute_cycle generates PROPOSED signal
+    sig = strategy_runner.execute_cycle(instance_id, user_id, market_data)
+    assert sig.status == "PROPOSED"
+
+    # 2. User manual approval triggers RiskEngine validation in BrokerOrderService
     with pytest.raises(RiskLimitExceededException) as exc_info:
-        strategy_runner.execute_cycle(instance_id, user_id, market_data)
+        strategy_runner.approve_signal(
+            user_id=user_id,
+            signal_id=signal_record.id,
+            actual_quantity=Decimal("10000"),
+            execution_mode="LIVE",
+        )
 
     assert "exceeds maximum limit" in str(exc_info.value)
-    assert signal_record.status == "REJECTED"
 
 
 def test_restart_recovery_prevents_duplicate_signal_execution(strategy_runner, mock_strategy_repo):
