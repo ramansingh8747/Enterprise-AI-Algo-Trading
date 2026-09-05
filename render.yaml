@@ -1,7 +1,7 @@
 databases:
   - name: algo-trading-db
     databaseName: algo_trading
-    user: algo-user
+    user: algo_user
     plan: free
 
 services:
