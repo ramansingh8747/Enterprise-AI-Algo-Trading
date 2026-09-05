@@ -47,4 +47,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: "https://algo-trading-backend.onrender.com/api/v1"
+        value: "https://algo-trading-backend-bqrc.onrender.com/api/v1"
