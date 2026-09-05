@@ -1,20 +1,42 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-algo_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-algo_secure_pass_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-algo_trading}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - trading_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-algo_user} -d ${POSTGRES_DB:-algo_trading}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     environment:
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg://algo_user:algo_secure_pass_2026@db:5432/algo_trading}
       - SECRET_KEY=${SECRET_KEY}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - BROKER_SECRET_KEY=${BROKER_SECRET_KEY}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
       - DEBUG=False
+      - LIVE_TRADING_ENABLED=False
+      - STRATEGY_SCHEDULER_ENABLED=True
     restart: always
     networks:
       - trading_net
+    depends_on:
+      db:
+        condition: service_healthy
 
   nginx:
     image: nginx:latest
@@ -34,3 +56,8 @@ services:
 networks:
   trading_net:
     driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+
