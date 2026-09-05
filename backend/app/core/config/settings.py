@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: float = 60.0
     DB_POOL_RECYCLE: int = 1800
 
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+psycopg://", 1)
+        if v.startswith("postgresql://") and not v.startswith("postgresql+"):
+            return v.replace("postgresql://", "postgresql+psycopg://", 1)
+        return v
+
     @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
@@ -61,7 +70,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_cors(self) -> "Settings":
-        if self.ENVIRONMENT.lower() == "production" or not self.DEBUG:
+        if self.ENVIRONMENT.lower() == "production":
             if "*" in self.CORS_ALLOWED_ORIGINS:
                 raise ValueError("CORS allow_origins cannot contain '*' in production environment.")
         return self

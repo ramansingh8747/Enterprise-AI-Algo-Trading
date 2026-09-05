@@ -36,7 +36,14 @@ const HEARTBEAT_INTERVAL_MS = 30000;
 
 export const getWebSocketUrl = (token?: string | null): string => {
   const envApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-  let wsUrl = envApiUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
+  let wsUrl = envApiUrl;
+
+  if (wsUrl.startsWith('/')) {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    wsUrl = `${proto}//${window.location.host}${wsUrl}`;
+  } else {
+    wsUrl = wsUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
+  }
 
   // Strip trailing slash if present
   if (wsUrl.endsWith('/')) {
@@ -48,13 +55,11 @@ export const getWebSocketUrl = (token?: string | null): string => {
     wsUrl = `${wsUrl}/ws`;
   }
 
+  const urlObj = new URL(wsUrl);
   if (token) {
-    const urlObj = new URL(wsUrl, window.location.origin.replace(/^http/, 'ws'));
     urlObj.searchParams.set('token', token);
-    return urlObj.toString();
   }
-
-  return wsUrl;
+  return urlObj.toString();
 };
 
 export const WebSocketProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
