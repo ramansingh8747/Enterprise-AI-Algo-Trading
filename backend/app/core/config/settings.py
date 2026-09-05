@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     BROKER_SECRET_KEY: str
     PASSWORD_MIN_LENGTH: int = 8
-    CORS_ALLOWED_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    CORS_ALLOWED_ORIGINS: Any = Field(default_factory=lambda: ["http://localhost:5173"])
 
     # Trading safety / production readiness defaults. LIVE trading remains disabled by default.
     LIVE_TRADING_ENABLED: bool = False
@@ -65,8 +65,19 @@ class Settings(BaseSettings):
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
         if isinstance(v, str):
+            v = v.strip()
+            if v.startswith("[") and v.endswith("]"):
+                import json
+                try:
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                except Exception:
+                    pass
             return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+        if isinstance(v, list):
+            return [str(origin).strip() for origin in v if str(origin).strip()]
+        return ["http://localhost:5173"]
 
     @model_validator(mode="after")
     def validate_production_cors(self) -> "Settings":

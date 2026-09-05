@@ -24,7 +24,7 @@ services:
       - key: BROKER_SECRET_KEY
         generateValue: true
       - key: CORS_ALLOWED_ORIGINS
-        value: "*"
+        value: '["*"]'
       - key: LIVE_TRADING_ENABLED
         value: "False"
       - key: STRATEGY_SCHEDULER_ENABLED
