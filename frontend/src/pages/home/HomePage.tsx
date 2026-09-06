@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/constants/routes';
 import { useAuth } from '@/context/AuthContext';
@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 export default function HomePage() {
   const navigate = useNavigate();
   const { isAuthenticated, logout } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleStartTrading = () => {
     if (isAuthenticated) {
@@ -33,32 +34,36 @@ export default function HomePage() {
   return (
     <div style={{
       minHeight: '100vh',
+      width: '100%',
       background: '#020617',
       color: '#f8fafc',
       fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       boxSizing: 'border-box',
+      overflowX: 'hidden',
     }}>
       {/* 1. NAVBAR */}
       <header style={{
         position: 'sticky',
         top: 0,
         zIndex: 50,
-        background: 'rgba(15, 23, 42, 0.85)',
+        background: 'rgba(15, 23, 42, 0.95)',
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid #1e293b',
-        padding: '1rem 2rem',
+        padding: '0.85rem 1.25rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        width: '100%',
+        boxSizing: 'border-box',
       }}>
         {/* Brand */}
         <div
-          onClick={() => navigate(ROUTES.HOME)}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer' }}
+          onClick={() => { setMobileMenuOpen(false); navigate(ROUTES.HOME); }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
         >
           <div style={{
-            width: '36px',
-            height: '36px',
+            width: '34px',
+            height: '34px',
             borderRadius: '0.5rem',
             background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
             display: 'flex',
@@ -66,26 +71,27 @@ export default function HomePage() {
             justifyContent: 'center',
             color: '#ffffff',
             fontWeight: 800,
-            fontSize: '1.2rem',
-            boxShadow: '0 0 15px rgba(2, 132, 199, 0.4)',
+            fontSize: '1.1rem',
+            boxShadow: '0 0 12px rgba(2, 132, 199, 0.4)',
+            flexShrink: 0,
           }}>
             ⚡
           </div>
-          <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.025em' }}>
+          <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.025em', whiteSpace: 'nowrap' }}>
             Antigravity<span style={{ color: '#38bdf8' }}>Algo</span>
           </span>
         </div>
 
-        {/* Links */}
-        <nav style={{ display: 'flex', gap: '1.75rem', alignItems: 'center' }}>
+        {/* Desktop Links */}
+        <nav className="homepage-desktop-nav" style={{ display: 'flex', gap: '1.75rem', alignItems: 'center' }}>
           <button onClick={() => navigate(ROUTES.WATCHLIST)} style={{ background: 'none', border: 'none', color: '#cbd5e1', fontSize: '0.925rem', fontWeight: 500, cursor: 'pointer' }}>Markets</button>
           <button onClick={() => navigate(ROUTES.STRATEGY)} style={{ background: 'none', border: 'none', color: '#cbd5e1', fontSize: '0.925rem', fontWeight: 500, cursor: 'pointer' }}>Strategies</button>
           <button onClick={() => scrollToSection('features')} style={{ background: 'none', border: 'none', color: '#cbd5e1', fontSize: '0.925rem', fontWeight: 500, cursor: 'pointer' }}>Features</button>
           <button onClick={() => scrollToSection('paper-trading')} style={{ background: 'none', border: 'none', color: '#cbd5e1', fontSize: '0.925rem', fontWeight: 500, cursor: 'pointer' }}>Paper Trading</button>
         </nav>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        {/* Desktop Action Buttons */}
+        <div className="homepage-desktop-actions" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {isAuthenticated ? (
             <>
               <button
@@ -172,15 +178,141 @@ export default function HomePage() {
               cursor: 'pointer',
               boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
               transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
             }}
           >
             {isAuthenticated ? 'Go to Trading Dashboard' : 'Start Paper Trading'}
           </button>
         </div>
+
+        {/* Mobile Hamburger Controls */}
+        <div className="homepage-mobile-toggle" style={{ display: 'none', alignItems: 'center', gap: '0.5rem' }}>
+          <button
+            type="button"
+            onClick={handleStartTrading}
+            style={{
+              padding: '0.45rem 0.8rem',
+              borderRadius: '0.375rem',
+              background: '#10b981',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: 800,
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+            }}
+          >
+            {isAuthenticated ? 'Dashboard' : 'Trade'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((prev: boolean) => !prev)}
+            aria-label="Toggle Navigation Menu"
+            style={{
+              background: 'transparent',
+              border: '1px solid #334155',
+              borderRadius: '0.375rem',
+              color: '#f8fafc',
+              fontSize: '1.25rem',
+              width: '38px',
+              height: '38px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            {mobileMenuOpen ? '✕' : '☰'}
+          </button>
+        </div>
       </header>
 
+      {/* Mobile Drawer Overlay */}
+      {mobileMenuOpen && (
+        <div style={{
+          position: 'fixed',
+          top: '58px',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(2, 6, 23, 0.98)',
+          backdropFilter: 'blur(12px)',
+          zIndex: 49,
+          padding: '1.25rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem',
+          overflowY: 'auto',
+          boxSizing: 'border-box',
+        }}>
+          <button
+            onClick={() => { setMobileMenuOpen(false); navigate(ROUTES.WATCHLIST); }}
+            style={{ padding: '0.85rem 1rem', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.5rem', color: '#f8fafc', fontSize: '0.95rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer' }}
+          >
+            📈 Markets & Watchlist
+          </button>
+          <button
+            onClick={() => { setMobileMenuOpen(false); navigate(ROUTES.STRATEGY); }}
+            style={{ padding: '0.85rem 1rem', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.5rem', color: '#f8fafc', fontSize: '0.95rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer' }}
+          >
+            🤖 Strategy Signals
+          </button>
+          <button
+            onClick={() => { setMobileMenuOpen(false); scrollToSection('features'); }}
+            style={{ padding: '0.85rem 1rem', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.5rem', color: '#f8fafc', fontSize: '0.95rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer' }}
+          >
+            ✨ Platform Features
+          </button>
+          <button
+            onClick={() => { setMobileMenuOpen(false); scrollToSection('paper-trading'); }}
+            style={{ padding: '0.85rem 1rem', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '0.5rem', color: '#f8fafc', fontSize: '0.95rem', fontWeight: 700, textAlign: 'left', cursor: 'pointer' }}
+          >
+            ⚡ Paper Trading Simulator
+          </button>
+
+          <div style={{ height: '1px', background: '#1e293b', margin: '0.35rem 0' }} />
+
+          {isAuthenticated ? (
+            <>
+              <button
+                onClick={() => { setMobileMenuOpen(false); navigate(ROUTES.DASHBOARD); }}
+                style={{ padding: '0.85rem', background: '#0284c7', border: 'none', borderRadius: '0.5rem', color: '#ffffff', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}
+              >
+                Go to Trading Dashboard
+              </button>
+              <button
+                onClick={() => { setMobileMenuOpen(false); logout(); }}
+                style={{ padding: '0.85rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '0.5rem', color: '#fca5a5', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}
+              >
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => { setMobileMenuOpen(false); navigate(ROUTES.LOGIN); }}
+                style={{ padding: '0.85rem', background: '#1e293b', border: '1px solid #334155', borderRadius: '0.5rem', color: '#f8fafc', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}
+              >
+                Trader Login
+              </button>
+              <button
+                onClick={() => { setMobileMenuOpen(false); navigate(ROUTES.ADMIN_LOGIN); }}
+                style={{ padding: '0.85rem', background: 'rgba(217, 119, 6, 0.2)', border: '1px solid rgba(245, 158, 11, 0.4)', borderRadius: '0.5rem', color: '#fde68a', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}
+              >
+                🛡️ Admin Portal Login
+              </button>
+              <button
+                onClick={() => { setMobileMenuOpen(false); handleStartTrading(); }}
+                style={{ padding: '0.85rem', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: '0.5rem', color: '#ffffff', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer' }}
+              >
+                Start Paper Trading
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* MAIN CONTAINER */}
-      <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '3rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '4rem' }}>
+      <main style={{ maxWidth: '1280px', width: '100%', margin: '0 auto', padding: '2rem 1rem', display: 'flex', flexDirection: 'column', gap: '3.5rem', boxSizing: 'border-box' }}>
         
         {/* 2. HERO SECTION */}
         <section style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', paddingTop: '2rem' }}>
@@ -373,7 +505,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.5rem' }}>
             <div onClick={() => navigate(ROUTES.WATCHLIST)} style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '1.75rem', borderRadius: '0.85rem', cursor: 'pointer' }}>
               <div style={{ fontSize: '1.75rem', marginBottom: '0.75rem' }}>📈</div>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: '#38bdf8' }}>Market Watch</h3>
