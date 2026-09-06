@@ -19,7 +19,7 @@ from app.services.interfaces.broker_session_service import BrokerSessionServiceI
 class LiveReadinessService:
     """Non-invasive pre-production gate. It never places, modifies, or cancels orders."""
 
-    SUPPORTED_LIVE_PROVIDERS = {"zerodha"}
+    SUPPORTED_LIVE_PROVIDERS = {"zerodha", "dhan"}
 
     def __init__(self, db: Session, session_service: BrokerSessionServiceInterface) -> None:
         self.db = db
@@ -78,7 +78,7 @@ class LiveReadinessService:
             checks.append(self._check(
                 "broker_provider",
                 "FAIL",
-                "Broker provider is not approved for LIVE readiness; only the implemented Zerodha path is eligible.",
+                "Broker provider is not approved for LIVE readiness; only implemented Zerodha and Dhan paths are eligible.",
                 provider=provider_name,
             ))
         else:

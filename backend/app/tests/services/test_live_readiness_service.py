@@ -99,3 +99,28 @@ async def test_readiness_blocks_active_kill_switch(monkeypatch):
 
     assert result.verdict == "NOT_READY"
     assert any(c.name == "risk_limits" and c.status == "FAIL" for c in result.checks)
+
+
+@pytest.mark.asyncio
+async def test_readiness_approves_dhan_broker_provider(monkeypatch):
+    broker_id = uuid4()
+    user_id = uuid4()
+    broker = SimpleNamespace(id=broker_id, broker_type="dhan", broker_name="DhanHQ API", is_active=True)
+    risk = SimpleNamespace(
+        max_order_quantity=100,
+        max_order_notional=10000,
+        max_position_quantity=500,
+        max_exposure_notional=50000,
+        max_orders_per_minute=10,
+        daily_loss_limit=5000,
+        kill_switch_active=False,
+    )
+    session = SimpleNamespace(expires_at=datetime.now(timezone.utc) + timedelta(hours=1))
+    monkeypatch.setattr(settings_module.settings, "LIVE_TRADING_ENABLED", False)
+
+    service = LiveReadinessService(make_db(risk=risk, broker=broker), FakeSessionService(session))
+    result = await service.verify(user_id, broker_id)
+
+    broker_check = next(c for c in result.checks if c.name == "broker_provider")
+    assert broker_check.status == "PASS"
+    assert "eligible for LIVE readiness" in broker_check.message
