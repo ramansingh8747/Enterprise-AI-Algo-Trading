@@ -35,6 +35,8 @@ services:
         value: "INFO"
       - key: ENVIRONMENT
         value: "staging"
+      - key: ENFORCE_MARKET_HOURS
+        value: "True"
       - key: SMS_PROVIDER
         value: "mock"
   - type: web

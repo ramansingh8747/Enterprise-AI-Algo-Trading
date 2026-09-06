@@ -4,7 +4,7 @@ from uuid import UUID
 from decimal import Decimal
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.api.v1.routes.auth import get_current_active_user
 from app.schemas.auth import UserResponse
@@ -127,10 +127,21 @@ def reset_paper_portfolio(
             repository.db.add(portfolio)
             repository.db.commit()
 
-        # Ensure all paper positions and executions are cleared cleanly
-        repository.db.execute(delete(PaperPosition))
-        repository.db.execute(delete(TradingExecution).where(TradingExecution.execution_mode == "PAPER"))
-        for p in repository.db.query(PaperPortfolio).filter(PaperPortfolio.execution_mode == "PAPER").all():
+        # Ensure all paper positions and executions are cleared cleanly for user
+        repository.db.execute(
+            delete(PaperPosition).where(
+                PaperPosition.paper_portfolio_id.in_(
+                    select(PaperPortfolio.id).where(PaperPortfolio.user_id == current_user.id)
+                )
+            )
+        )
+        repository.db.execute(
+            delete(TradingExecution).where(
+                TradingExecution.execution_mode == "PAPER",
+                TradingExecution.user_id == current_user.id,
+            )
+        )
+        for p in repository.db.query(PaperPortfolio).filter(PaperPortfolio.execution_mode == "PAPER", PaperPortfolio.user_id == current_user.id).all():
             if custom_cash is not None:
                 p.initial_balance = custom_cash
                 p.cash_balance = custom_cash
@@ -148,9 +159,25 @@ def reset_paper_portfolio(
         except ValueError:
             portfolio = repository.reset_all_paper_for_user(user_id=current_user.id)
 
-        if custom_cash is not None and portfolio:
-            portfolio.initial_balance = custom_cash
-            portfolio.cash_balance = custom_cash
+        if portfolio:
+            # Clear positions and paper orders for this portfolio and user
+            repository.db.execute(
+                delete(PaperPosition).where(PaperPosition.paper_portfolio_id == portfolio.id)
+            )
+            repository.db.execute(
+                delete(TradingExecution).where(
+                    TradingExecution.execution_mode == "PAPER",
+                    TradingExecution.user_id == current_user.id,
+                )
+            )
+            if custom_cash is not None:
+                portfolio.initial_balance = custom_cash
+                portfolio.cash_balance = custom_cash
+            else:
+                portfolio.cash_balance = portfolio.initial_balance
+            portfolio.realized_pnl = Decimal("0.0000")
+            portfolio.unrealized_pnl = Decimal("0.0000")
+            portfolio.total_pnl = Decimal("0.0000")
             repository.db.add(portfolio)
             repository.db.commit()
 
