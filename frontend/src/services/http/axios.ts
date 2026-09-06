@@ -16,12 +16,14 @@ const getApiBaseUrl = (): string => {
   if (
     typeof window !== 'undefined' &&
     window.location.hostname &&
-    window.location.hostname !== 'localhost' &&
-    window.location.hostname !== '127.0.0.1'
+    window.location.hostname.includes('onrender.com')
   ) {
-    return '/api/v1';
+    return 'https://algo-trading-backend-bqrc.onrender.com/api/v1';
   }
-  return env.VITE_API_URL;
+  if (env.VITE_API_URL && env.VITE_API_URL !== '/api/v1') {
+    return env.VITE_API_URL;
+  }
+  return 'http://localhost:8000/api/v1';
 };
 
 const axiosInstance: AxiosInstance = axios.create({

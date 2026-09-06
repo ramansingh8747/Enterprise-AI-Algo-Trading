@@ -35,7 +35,9 @@ const MAX_RETRY_DELAY_MS = 30000;
 const HEARTBEAT_INTERVAL_MS = 30000;
 
 export const getWebSocketUrl = (token?: string | null): string => {
-  const envApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+  const envApiUrl = (typeof window !== 'undefined' && window.location.hostname && window.location.hostname.includes('onrender.com'))
+    ? 'https://algo-trading-backend-bqrc.onrender.com/api/v1'
+    : (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1');
   let wsUrl = envApiUrl;
 
   if (wsUrl.startsWith('/')) {
