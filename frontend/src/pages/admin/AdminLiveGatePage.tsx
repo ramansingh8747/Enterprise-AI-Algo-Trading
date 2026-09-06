@@ -23,13 +23,33 @@ const AdminLiveGatePage: React.FC = () => {
     brokersApi.listBrokers()
       .then((items) => {
         setBrokers(items);
-        const active = items.find((item) => item.broker_type.toLowerCase() === 'zerodha' && item.is_active)
-          ?? items.find((item) => item.is_active);
+        const savedId = localStorage.getItem('admin_live_gate_broker_id');
+        const savedExists = savedId ? items.find((item) => item.id === savedId) : null;
+        if (savedExists) {
+          setBrokerId(savedExists.id);
+          return;
+        }
+        const activeDhan = items.find((item) => item.broker_type.toLowerCase() === 'dhan' && item.is_active);
+        const active = activeDhan
+          ?? items.find((item) => item.is_active)
+          ?? items[0];
         setBrokerId(active?.id ?? '');
+        if (active?.id) {
+          localStorage.setItem('admin_live_gate_broker_id', active.id);
+        }
       })
       .catch((err: any) => setError(err.message || 'Unable to load broker accounts.'))
       .finally(() => setInitialLoading(false));
   }, []);
+
+  const handleBrokerChange = (id: string) => {
+    setBrokerId(id);
+    if (id) {
+      localStorage.setItem('admin_live_gate_broker_id', id);
+    } else {
+      localStorage.removeItem('admin_live_gate_broker_id');
+    }
+  };
 
   const evaluate = async () => {
     if (!brokerId) return;
@@ -95,7 +115,7 @@ const AdminLiveGatePage: React.FC = () => {
       <section style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 12, padding: '1.25rem', marginBottom: '1rem' }}>
         <label htmlFor="live-gate-broker" style={{ display: 'block', marginBottom: '.5rem', fontWeight: 700 }}>Broker account</label>
         <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
-          <select id="live-gate-broker" value={brokerId} onChange={(e) => setBrokerId(e.target.value)} disabled={initialLoading || loading} style={{ minWidth: 320, padding: '.7rem', borderRadius: 8, background: '#020617', color: '#f8fafc', border: '1px solid #475569' }}>
+          <select id="live-gate-broker" value={brokerId} onChange={(e) => handleBrokerChange(e.target.value)} disabled={initialLoading || loading} style={{ minWidth: 320, padding: '.7rem', borderRadius: 8, background: '#020617', color: '#f8fafc', border: '1px solid #475569' }}>
             <option value="">Select broker</option>
             {brokers.map((broker) => <option key={broker.id} value={broker.id}>{broker.broker_name} ({broker.broker_type}){broker.is_active ? '' : ' — inactive'}</option>)}
           </select>
