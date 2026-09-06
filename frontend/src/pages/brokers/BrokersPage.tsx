@@ -458,6 +458,7 @@ export default function BrokersPage() {
                           display: "flex",
                           flexDirection: "column",
                           gap: "1.25rem",
+                          alignSelf: "start",
                         }}
                       >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>

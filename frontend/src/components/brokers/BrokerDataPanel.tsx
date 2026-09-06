@@ -84,14 +84,35 @@ export const BrokerDataPanel: React.FC<BrokerDataPanelProps> = ({
         }
       } catch (err: any) {
         if (isMounted) {
+          const errMsg = typeof err === 'string' ? err : err.message || '';
           if (err.status === 401) {
             setError('Authentication required. Please log in again.');
           } else if (err.status === 403) {
             setError('Access denied to broker data.');
           } else if (err.status === 404) {
             setError('Broker session unavailable or no data found.');
+          } else if (
+            errMsg.includes('No holdings available') ||
+            errMsg.includes('HOLDING_ERROR') ||
+            errMsg.includes('DH-1111')
+          ) {
+            // Dhan returns error DH-1111 when user has 0 holdings
+            setHoldings([]);
+            setError(null);
+          } else if (
+            errMsg.includes('No positions available') ||
+            errMsg.includes('POSITION_ERROR')
+          ) {
+            setPositions([]);
+            setError(null);
+          } else if (
+            errMsg.includes('No orders available') ||
+            errMsg.includes('ORDER_ERROR')
+          ) {
+            setOrders([]);
+            setError(null);
           } else {
-            setError(err.message || 'Failed to load broker data.');
+            setError(errMsg || 'Failed to load broker data.');
           }
         }
       } finally {
@@ -143,39 +164,58 @@ export const BrokerDataPanel: React.FC<BrokerDataPanelProps> = ({
       background: '#0f172a',
       borderRadius: '0.75rem',
       border: '1px solid #334155',
-      padding: '1.25rem',
+      padding: '1rem',
       color: '#f8fafc',
       fontFamily: 'system-ui, sans-serif',
       display: 'flex',
       flexDirection: 'column',
       gap: '1rem',
+      width: '100%',
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      overflow: 'hidden',
     }}>
       {/* Panel Header & Sub-navigation Tabs */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div>
-          <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#38bdf8' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%' }}>
+        <div style={{ overflow: 'hidden' }}>
+          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#38bdf8', wordBreak: 'break-word' }}>
             {brokerName} — Read-Only Broker Data
           </h4>
-          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+          <span style={{ fontSize: '0.75rem', color: '#94a3b8', wordBreak: 'break-all', display: 'block' }}>
             Broker ID: <code style={{ color: '#cbd5e1' }}>{brokerId}</code>
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.35rem', background: '#1e293b', padding: '0.25rem', borderRadius: '0.5rem', border: '1px solid #334155' }}>
+        <div style={{
+          display: 'flex',
+          gap: '0.25rem',
+          background: '#1e293b',
+          padding: '0.25rem',
+          borderRadius: '0.5rem',
+          border: '1px solid #334155',
+          overflowX: 'auto',
+          flexWrap: 'wrap',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}>
           {(['profile', 'holdings', 'positions', 'orders', 'quotes'] as BrokerDataTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               style={{
-                padding: '0.4rem 0.85rem',
+                flex: '1 1 auto',
+                minWidth: '55px',
+                padding: '0.35rem 0.5rem',
                 borderRadius: '0.375rem',
                 border: 'none',
                 background: activeTab === tab ? '#0284c7' : 'transparent',
                 color: activeTab === tab ? '#ffffff' : '#94a3b8',
-                fontSize: '0.8rem',
+                fontSize: '0.75rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 textTransform: 'capitalize',
+                textAlign: 'center',
+                whiteSpace: 'nowrap',
               }}
             >
               {tab}
@@ -191,20 +231,26 @@ export const BrokerDataPanel: React.FC<BrokerDataPanelProps> = ({
         </div>
       ) : error ? (
         <div style={{
-          padding: '1rem',
+          padding: '0.85rem 1rem',
           background: 'rgba(239, 68, 68, 0.15)',
           border: '1px solid #ef4444',
           borderRadius: '0.5rem',
           color: '#fca5a5',
-          fontSize: '0.85rem',
+          fontSize: '0.8rem',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: 'column',
+          gap: '0.65rem',
+          width: '100%',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
         }}>
-          <span>{error}</span>
+          <div style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', lineHeight: 1.4 }}>
+            {error}
+          </div>
           <button
             onClick={() => setActiveTab(activeTab)}
             style={{
+              alignSelf: 'flex-start',
               padding: '0.35rem 0.75rem',
               background: '#ef4444',
               color: '#ffffff',
