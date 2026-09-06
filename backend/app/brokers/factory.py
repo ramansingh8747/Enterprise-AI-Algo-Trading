@@ -51,7 +51,11 @@ class BrokerFactory:
         elif normalized_name == "angelone":
             return AngelOneBroker()
         elif normalized_name == "dhan":
-            return DhanBroker()
+            return DhanBroker(
+                session_service=session_service,
+                broker_id=broker_id,
+                client=client,
+            )
         else:
             raise ValueError(f"Unsupported broker provider: {provider_name}")
 

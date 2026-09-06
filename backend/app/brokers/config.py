@@ -36,3 +36,19 @@ class AngelOneSettings(BaseSettings):
         case_sensitive=True,
         extra="ignore"
     )
+
+
+class DhanSettings(BaseSettings):
+    """DhanHQ broker configuration settings."""
+
+    DHAN_CLIENT_ID: Optional[str] = None
+    DHAN_ACCESS_TOKEN: Optional[str] = None
+    DHAN_BASE_URL: str = "https://api.dhan.co/v2"
+    DHAN_TIMEOUT: int = 15
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"
+    )
