@@ -1,4 +1,4 @@
-export type BrokerType = "zerodha" | "angelone";
+export type BrokerType = "dhan" | "zerodha" | "angelone";
 
 export type BrokerConnectionStatus =
   | "connected"

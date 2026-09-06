@@ -42,6 +42,7 @@ import {
 } from '@/services/paperTrading/paperAnalyticsService';
 import { getMarketSessionStatus } from '@/utils/marketTiming';
 import { brokerDataApi } from '@/services/api/brokerDataApi';
+import { brokersApi, BrokerResponse } from '@/services/api/brokersApi';
 import { paperPortfolioApi } from '@/services/api/paperPortfolioApi';
 import { paperOrdersApi } from '@/services/api/paperOrdersApi';
 import { useNavigate } from 'react-router-dom';
@@ -131,26 +132,54 @@ export default function DashboardPage() {
     }
   }, [brokerId]);
 
-  const [selectedBrokerType, setSelectedBrokerType] = useState<BrokerType>('zerodha');
-
-  const [brokerConnections] = useState<Record<BrokerType, BrokerConnection>>(() => {
-    try {
-      const stored = localStorage.getItem("algo_trading_broker_connection");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return {
-          zerodha: parsed.zerodha || { brokerType: "zerodha", brokerName: "Zerodha (Kite)", status: "disconnected" },
-          angelone: parsed.angelone || { brokerType: "angelone", brokerName: "Angel One (SmartAPI)", status: "disconnected" },
-        };
-      }
-    } catch (_err) {
-      // Ignored localStorage access error
-    }
-    return {
-      zerodha: { brokerType: "zerodha", brokerName: "Zerodha (Kite)", status: "disconnected" },
-      angelone: { brokerType: "angelone", brokerName: "Angel One (SmartAPI)", status: "disconnected" },
-    };
+  const [registeredBrokers, setRegisteredBrokers] = useState<BrokerResponse[]>([]);
+  const [selectedBrokerType, setSelectedBrokerType] = useState<BrokerType>(() => {
+    return (localStorage.getItem("dashboard_selected_broker_type") as BrokerType) || "dhan";
   });
+
+  useEffect(() => {
+    brokersApi.listBrokers()
+      .then((items) => {
+        setRegisteredBrokers(items);
+        const dhan = items.find((b) => b.broker_type.toLowerCase() === 'dhan' && b.is_active);
+        if (dhan) {
+          setBrokerId(dhan.id);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const dhanBroker = registeredBrokers.find((b) => b.broker_type.toLowerCase() === 'dhan');
+  const zerodhaBroker = registeredBrokers.find((b) => b.broker_type.toLowerCase().includes('zerodha'));
+  const angelBroker = registeredBrokers.find((b) => b.broker_type.toLowerCase().includes('angel'));
+
+  const isDhanConnected = Boolean(dhanBroker && dhanBroker.is_active);
+  const isZerodhaConnected = Boolean(zerodhaBroker && zerodhaBroker.is_active);
+  const isAngelConnected = Boolean(angelBroker && angelBroker.is_active);
+
+  const brokerConnections: Record<BrokerType, BrokerConnection> = useMemo(() => ({
+    dhan: {
+      brokerType: "dhan",
+      brokerName: dhanBroker?.broker_name || "Dhan (HQ)",
+      status: isDhanConnected ? "connected" : "disconnected",
+      accountId: dhanBroker?.client_id || "1113530322",
+      clientName: dhanBroker?.broker_name || "DhanHQ API",
+    },
+    zerodha: {
+      brokerType: "zerodha",
+      brokerName: zerodhaBroker?.broker_name || "Zerodha (Kite)",
+      status: isZerodhaConnected ? "connected" : "disconnected",
+      accountId: zerodhaBroker?.client_id || undefined,
+      clientName: zerodhaBroker?.broker_name,
+    },
+    angelone: {
+      brokerType: "angelone",
+      brokerName: angelBroker?.broker_name || "Angel One (SmartAPI)",
+      status: isAngelConnected ? "connected" : "disconnected",
+      accountId: angelBroker?.client_id || undefined,
+      clientName: angelBroker?.broker_name,
+    },
+  }), [dhanBroker, zerodhaBroker, angelBroker, isDhanConnected, isZerodhaConnected, isAngelConnected]);
 
   const activeBrokerConnection = brokerConnections[selectedBrokerType];
 
@@ -158,8 +187,10 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
 
-    const isZerodha = selectedBrokerType === 'zerodha';
-    const targetBrokerId = isZerodha ? 'c2ce3afe-4468-49fc-9278-880111831207' : 'angel-one-demo-id';
+    const targetBroker = registeredBrokers.find(b => b.broker_type.toLowerCase().includes(selectedBrokerType))
+      ?? registeredBrokers.find(b => b.broker_type.toLowerCase() === 'dhan')
+      ?? registeredBrokers[0];
+    const targetBrokerId = targetBroker?.id || (selectedBrokerType === 'dhan' ? brokerId : 'c2ce3afe-4468-49fc-9278-880111831207');
 
     try {
       const [profData, holdData, posData, ordData, quoteData] = await Promise.all([
@@ -180,7 +211,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedBrokerType]);
+  }, [selectedBrokerType, registeredBrokers, brokerId]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -526,7 +557,9 @@ export default function DashboardPage() {
             selectedBrokerType={selectedBrokerType}
             onSelectBroker={(type) => {
               setSelectedBrokerType(type);
-              setNotification(`Switched active broker to ${type === 'zerodha' ? 'Zerodha (Kite)' : 'Angel One (SmartAPI)'}`);
+              localStorage.setItem("dashboard_selected_broker_type", type);
+              const label = type === 'dhan' ? 'Dhan (HQ)' : type === 'zerodha' ? 'Zerodha (Kite)' : 'Angel One (SmartAPI)';
+              setNotification(`Switched active broker to ${label}`);
               setTimeout(() => setNotification(null), 3000);
             }}
           />

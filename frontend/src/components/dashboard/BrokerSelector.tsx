@@ -16,10 +16,12 @@ export const BrokerSelector: React.FC<BrokerSelectorProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  const dhanConn = connections.dhan;
   const zerodhaConn = connections.zerodha;
   const angeloneConn = connections.angelone;
 
   const hasAnyConnection =
+    (dhanConn && dhanConn.status === 'connected') ||
     (zerodhaConn && zerodhaConn.status === 'connected') ||
     (angeloneConn && angeloneConn.status === 'connected');
 
@@ -42,6 +44,35 @@ export const BrokerSelector: React.FC<BrokerSelectorProps> = ({
         </span>
 
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {/* Dhan Selector Button */}
+          <button
+            type="button"
+            onClick={() => onSelectBroker('dhan')}
+            style={{
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              fontSize: '0.875rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.2s',
+              background: selectedBrokerType === 'dhan'
+                ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                : '#0f172a',
+              color: selectedBrokerType === 'dhan' ? '#ffffff' : '#cbd5e1',
+              border: selectedBrokerType === 'dhan' ? '1px solid #10b981' : '1px solid #334155',
+            }}
+          >
+            <span>Dhan (HQ)</span>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: dhanConn?.status === 'connected' ? '#4ade80' : '#94a3b8',
+            }} />
+          </button>
           {/* Zerodha Selector Button */}
           <button
             type="button"

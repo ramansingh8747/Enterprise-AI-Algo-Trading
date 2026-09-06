@@ -59,7 +59,7 @@ export const ActiveBrokerCard: React.FC<ActiveBrokerCardProps> = ({ connection }
           </div>
 
           <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.2rem', display: 'block' }}>
-            {isConnected ? `Account ID: ${connection.accountId || 'DEMO-ACCOUNT'} • Demo Connection` : 'Connect Zerodha or Angel One account to view broker data.'}
+            {isConnected ? `Account ID: ${connection.accountId || 'DEMO-ACCOUNT'} • Connected Broker Session` : 'Connect Dhan, Zerodha, or Angel One account to view broker data.'}
           </span>
         </div>
       </div>
