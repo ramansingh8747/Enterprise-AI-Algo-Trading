@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { brokersApi, BrokerResponse, BrokerRequest } from "@/services/api/brokersApi";
 import { BrokerSessionCard } from "@/components/brokers/BrokerSessionCard";
@@ -13,6 +13,7 @@ export default function BrokersPage() {
   const [brokers, setBrokers] = useState<BrokerResponse[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterMode, setFilterMode] = useState<'all' | 'real_only'>('real_only');
 
   // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -50,13 +51,35 @@ export default function BrokersPage() {
     setError(null);
     try {
       const data = await brokersApi.listBrokers();
-      setBrokers(data);
+      const sorted = [...data].sort((a, b) => {
+        const aIsDhan = a.broker_type.toLowerCase().includes('dhan') || a.broker_name.toLowerCase().includes('dhan');
+        const bIsDhan = b.broker_type.toLowerCase().includes('dhan') || b.broker_name.toLowerCase().includes('dhan');
+        if (aIsDhan && !bIsDhan) return -1;
+        if (!aIsDhan && bIsDhan) return 1;
+        const aIsTest = a.broker_name.toLowerCase().includes('test') || a.broker_name.toLowerCase().includes('sample');
+        const bIsTest = b.broker_name.toLowerCase().includes('test') || b.broker_name.toLowerCase().includes('sample');
+        if (!aIsTest && bIsTest) return -1;
+        if (aIsTest && !bIsTest) return 1;
+        return 0;
+      });
+      setBrokers(sorted);
     } catch (err: any) {
       setError(err.message || 'Failed to load registered brokers.');
     } finally {
       setLoading(false);
     }
   };
+
+  const displayedBrokers = useMemo(() => {
+    if (filterMode === 'real_only') {
+      const filtered = brokers.filter(
+        (b) => !b.broker_name.toLowerCase().includes('test') && !b.broker_name.toLowerCase().includes('sample')
+      );
+      // If no real broker is left, fallback to showing all so page is never accidentally blank
+      return filtered.length > 0 ? filtered : brokers;
+    }
+    return brokers;
+  }, [brokers, filterMode]);
 
   useEffect(() => {
     fetchBrokers();
@@ -380,63 +403,106 @@ export default function BrokersPage() {
                 </button>
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: "1.5rem" }}>
-                {brokers.map((broker) => (
-                  <div
-                    key={broker.id}
-                    style={{
-                      background: "#1e293b",
-                      borderRadius: "0.75rem",
-                      border: broker.is_active ? "1px solid #10b981" : "1px solid #334155",
-                      padding: "1.5rem",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "1.25rem",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
-                        <div style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "0.5rem",
-                          background: "linear-gradient(135deg, #0284c7 0%, #2563eb 100%)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "1.25rem",
-                          color: "#ffffff",
-                          fontWeight: 800,
-                        }}>
-                          {broker.broker_name.charAt(0).toUpperCase()}
-                        </div>
-
-                        <div>
-                          <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700, color: "#f8fafc" }}>
-                            {broker.broker_name}
-                          </h3>
-                          <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-                            Type: {broker.broker_type} {broker.client_id ? `| Client: ${broker.client_id}` : ''}
-                          </span>
-                        </div>
-                      </div>
-
-                      <span style={{
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.75rem" }}>
+                  <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                    Showing <strong>{displayedBrokers.length}</strong> broker{displayedBrokers.length === 1 ? '' : 's'}
+                  </span>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => setFilterMode('real_only')}
+                      style={{
+                        padding: "0.35rem 0.75rem",
+                        borderRadius: "0.375rem",
                         fontSize: "0.75rem",
                         fontWeight: 700,
-                        padding: "0.25rem 0.65rem",
-                        borderRadius: "1rem",
-                        color: broker.is_active ? "#4ade80" : "#94a3b8",
-                        background: broker.is_active ? "rgba(74, 222, 128, 0.15)" : "rgba(148, 163, 184, 0.15)",
-                        border: broker.is_active ? "1px solid rgba(74, 222, 128, 0.3)" : "1px solid #334155",
-                      }}>
-                        {broker.is_active ? "● Active" : "Inactive"}
-                      </span>
-                    </div>
+                        cursor: "pointer",
+                        border: filterMode === 'real_only' ? "1px solid #10b981" : "1px solid #334155",
+                        background: filterMode === 'real_only' ? "rgba(16, 185, 129, 0.2)" : "#0f172a",
+                        color: filterMode === 'real_only' ? "#6ee7b7" : "#94a3b8",
+                      }}
+                    >
+                      Active Brokers Only
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilterMode('all')}
+                      style={{
+                        padding: "0.35rem 0.75rem",
+                        borderRadius: "0.375rem",
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        border: filterMode === 'all' ? "1px solid #38bdf8" : "1px solid #334155",
+                        background: filterMode === 'all' ? "rgba(56, 189, 248, 0.2)" : "#0f172a",
+                        color: filterMode === 'all' ? "#38bdf8" : "#94a3b8",
+                      }}
+                    >
+                      Show All (Including Test Mocks)
+                    </button>
+                  </div>
+                </div>
 
-                    <div style={{ fontSize: "0.8rem", color: "#cbd5e1", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                      <div><strong>ID:</strong> <code style={{ color: "#38bdf8" }}>{broker.id}</code></div>
-                    </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: "1.5rem" }}>
+                  {displayedBrokers.map((broker) => {
+                    const isTest = broker.broker_name.toLowerCase().includes('test') || broker.broker_name.toLowerCase().includes('sample');
+                    return (
+                      <div
+                        key={broker.id}
+                        style={{
+                          background: "#1e293b",
+                          borderRadius: "0.75rem",
+                          border: isTest ? "1px solid #334155" : broker.is_active ? "1px solid #10b981" : "1px solid #334155",
+                          padding: "1.5rem",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "1.25rem",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
+                            <div style={{
+                              width: "44px",
+                              height: "44px",
+                              borderRadius: "0.5rem",
+                              background: isTest ? "#334155" : "linear-gradient(135deg, #0284c7 0%, #2563eb 100%)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: "1.25rem",
+                              color: "#ffffff",
+                              fontWeight: 800,
+                            }}>
+                              {broker.broker_name.charAt(0).toUpperCase()}
+                            </div>
+
+                            <div>
+                              <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700, color: "#f8fafc" }}>
+                                {broker.broker_name}
+                              </h3>
+                              <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                                Type: {broker.broker_type} {broker.client_id ? `| Client: ${broker.client_id}` : ''}
+                              </span>
+                            </div>
+                          </div>
+
+                          <span style={{
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            padding: "0.25rem 0.65rem",
+                            borderRadius: "1rem",
+                            color: isTest ? "#fbbf24" : broker.is_active ? "#4ade80" : "#94a3b8",
+                            background: isTest ? "rgba(245, 158, 11, 0.15)" : broker.is_active ? "rgba(74, 222, 128, 0.15)" : "rgba(148, 163, 184, 0.15)",
+                            border: isTest ? "1px solid rgba(245, 158, 11, 0.3)" : broker.is_active ? "1px solid rgba(74, 222, 128, 0.3)" : "1px solid #334155",
+                          }}>
+                            {isTest ? "🧪 Test Mock" : broker.is_active ? "● Configured" : "Inactive"}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: "0.8rem", color: "#cbd5e1", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                          <div><strong>ID:</strong> <code style={{ color: "#38bdf8" }}>{broker.id}</code></div>
+                        </div>
 
                     {/* Integrated Broker Session Management */}
                     <BrokerSessionCard
@@ -530,10 +596,12 @@ export default function BrokersPage() {
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
+                );
+              })}
+            </div>
+          </div>
+          )}
+        </section>
       </div>
 
       {/* Modal: Create / Edit Broker */}
