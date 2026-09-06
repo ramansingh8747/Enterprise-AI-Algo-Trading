@@ -68,6 +68,16 @@ class AdminPortfoliosApi extends BaseApi {
       this.http.get(`/admin/portfolios/${encodeURIComponent(portfolioRef)}`, { params: { source } }), false,
     );
   }
+
+  async delete(portfolioRef: string): Promise<void> {
+    return this.handleRequest<void>(this.http.delete(`/admin/portfolios/${encodeURIComponent(portfolioRef)}`), false);
+  }
+
+  async purgeTests(): Promise<{ message: string; deleted_count: number }> {
+    return this.handleRequest<{ message: string; deleted_count: number }>(
+      this.http.delete('/admin/portfolios/purge-tests'), false,
+    );
+  }
 }
 
 export const adminPortfoliosApi = new AdminPortfoliosApi();

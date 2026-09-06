@@ -5,7 +5,7 @@ from math import ceil
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.database.models.broker import Broker
@@ -222,3 +222,36 @@ class AdminPortfolioService:
     def get_portfolio(self, portfolio_ref: UUID, source: str) -> Optional[AdminPortfolioItem]:
         response = self.list_portfolios(page=1, page_size=100, execution_mode="PAPER" if source == "PAPER_PORTFOLIO" else "LIVE")
         return next((item for item in response.items if item.portfolio_ref == portfolio_ref and item.source == source), None)
+
+    def delete_paper_portfolio(self, portfolio_id: UUID) -> bool:
+        portfolio = self.db.get(PaperPortfolio, portfolio_id)
+        if not portfolio:
+            return False
+        self.db.execute(delete(PaperPosition).where(PaperPosition.portfolio_id == portfolio_id))
+        if portfolio.strategy_instance_id:
+            instance = self.db.get(StrategyInstance, portfolio.strategy_instance_id)
+            if instance:
+                self.db.delete(instance)
+        self.db.delete(portfolio)
+        self.db.commit()
+        return True
+
+    def purge_test_portfolios(self) -> int:
+        """Purge test broker paper portfolios (e.g. TestBroker, Zerodha, or unassigned)."""
+        stmt = (
+            select(PaperPortfolio.id)
+            .outerjoin(StrategyInstance, StrategyInstance.id == PaperPortfolio.strategy_instance_id)
+            .outerjoin(Broker, Broker.id == StrategyInstance.broker_id)
+            .where(or_(
+                Broker.broker_name.ilike("%test%"),
+                Broker.broker_name.ilike("%zerodha%"),
+                Broker.broker_type.ilike("%zerodha%"),
+                StrategyInstance.broker_id.is_(None)
+            ))
+        )
+        portfolio_ids = [row[0] for row in self.db.execute(stmt).fetchall()]
+        count = 0
+        for pid in portfolio_ids:
+            if self.delete_paper_portfolio(pid):
+                count += 1
+        return count

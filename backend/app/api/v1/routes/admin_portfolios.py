@@ -44,3 +44,24 @@ def get_admin_portfolio(
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Portfolio/account not found")
     return item
+
+
+@router.delete("/purge-tests", status_code=status.HTTP_200_OK)
+def purge_test_portfolios(
+    db: Session = Depends(get_db),
+):
+    """Purge test broker paper portfolios."""
+    deleted_count = AdminPortfolioService(db).purge_test_portfolios()
+    return {"message": f"Successfully purged {deleted_count} test portfolios.", "deleted_count": deleted_count}
+
+
+@router.delete("/{portfolio_ref}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_admin_portfolio(
+    portfolio_ref: UUID,
+    db: Session = Depends(get_db),
+):
+    """Delete an individual paper portfolio and its associated strategy instance."""
+    success = AdminPortfolioService(db).delete_paper_portfolio(portfolio_ref)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Portfolio not found")
+    return None
