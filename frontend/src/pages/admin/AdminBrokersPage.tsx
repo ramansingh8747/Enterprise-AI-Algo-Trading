@@ -2,6 +2,7 @@ import React, { FormEvent, useCallback, useEffect, useState } from 'react';
 import { adminBrokersApi, AdminBrokerItem } from '@/services/api/adminBrokersApi';
 import { brokersApi, BrokerRequest } from '@/services/api/brokersApi';
 import AdminSidebar from '@/components/admin/AdminSidebar';
+import { BrokerSessionCreateModal } from '@/components/brokers/BrokerSessionCreateModal';
 import { getMarketSessionStatus } from '@/utils/marketTiming';
 import './AdminDashboardPage.css';
 import './AdminBrokersPage.css';
@@ -23,6 +24,7 @@ const AdminBrokersPage: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selected, setSelected] = useState<AdminBrokerItem | null>(null);
+  const [sessionBroker, setSessionBroker] = useState<AdminBrokerItem | null>(null);
   const [form, setForm] = useState({
     broker_name: '',
     broker_type: 'zerodha',
@@ -204,7 +206,7 @@ const AdminBrokersPage: React.FC = () => {
                       <td><span className={`admin-brokers__status ${broker.session.active ? 'is-good' : 'is-bad'}`}>{broker.session.active ? 'CONNECTED' : 'NOT CONNECTED'}</span><small>{broker.session.active_session_count} active / {broker.session.session_count} total</small></td>
                       <td>{formatDate(broker.session.earliest_expiry)}</td>
                       <td>{formatDate(broker.updated_at)}</td>
-                      <td><div className="admin-brokers__actions"><button type="button" onClick={() => openEdit(broker)}>Edit</button><button type="button" className="danger" onClick={() => void deleteBroker(broker)}>Delete</button></div></td>
+                      <td><div className="admin-brokers__actions"><button type="button" onClick={() => setSessionBroker(broker)} style={{ background: '#0284c7', color: '#ffffff', fontWeight: 600 }}>Connect</button><button type="button" onClick={() => openEdit(broker)}>Edit</button><button type="button" className="danger" onClick={() => void deleteBroker(broker)}>Delete</button></div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -232,6 +234,21 @@ const AdminBrokersPage: React.FC = () => {
             <div className="admin-brokers__modal-actions"><button type="button" onClick={closeModal}>Cancel</button><button type="submit" disabled={saving} className="admin-brokers__primary">{saving ? 'Saving…' : modalMode === 'create' ? 'Register Broker' : 'Save Changes'}</button></div>
           </form>
         </div>
+      )}
+      {sessionBroker && (
+        <BrokerSessionCreateModal
+          open={Boolean(sessionBroker)}
+          brokerId={sessionBroker.id}
+          brokerName={sessionBroker.broker_name}
+          onClose={() => setSessionBroker(null)}
+          onCreated={() => {
+            const name = sessionBroker.broker_name;
+            setSessionBroker(null);
+            void loadBrokers(true);
+            setToast(`Session created successfully for ${name}.`);
+          }}
+          onShowToast={(msg) => setToast(msg)}
+        />
       )}
     </div>
   );
