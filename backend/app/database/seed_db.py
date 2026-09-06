@@ -58,7 +58,7 @@ def seed_database():
             b_obj = Broker(
                 id=UUID(b["id"]),
                 broker_name=b["broker_name"],
-                broker_type=b["roker_type"],
+                broker_type=b["broker_type"],
                 is_active=b["is_active"],
                 api_key=b.get("api_key"),
                 api_secret=b.get("api_secret"),
