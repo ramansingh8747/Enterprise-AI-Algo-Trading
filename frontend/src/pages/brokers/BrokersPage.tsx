@@ -59,19 +59,15 @@ export default function BrokersPage() {
   };
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchBrokers();
-      const interval = setInterval(() => {
-        const session = getMarketSessionStatus();
-        if (session.isOpen || session.canExit) {
-          fetchBrokers();
-        }
-      }, 5000);
-      return () => clearInterval(interval);
-    } else {
-      setLoading(false);
-    }
-  }, [isAdmin]);
+    fetchBrokers();
+    const interval = setInterval(() => {
+      const session = getMarketSessionStatus();
+      if (session.isOpen || session.canExit) {
+        fetchBrokers();
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const openCreateModal = () => {
     setFormName('');
@@ -310,9 +306,8 @@ export default function BrokersPage() {
           </div>
         )}
 
-        {/* Admin Broker List Section */}
-        {isAdmin && (
-          <section>
+        {/* Broker List Section (Admin Management & Trader Read-Only View) */}
+        <section>
             {loading ? (
               <div style={{
                 padding: "3rem",
@@ -497,45 +492,48 @@ export default function BrokersPage() {
                         Details
                       </button>
 
-                      <button
-                        onClick={() => openEditModal(broker)}
-                        style={{
-                          flex: 1,
-                          padding: "0.5rem",
-                          borderRadius: "0.375rem",
-                          background: "#0284c7",
-                          border: "none",
-                          color: "#ffffff",
-                          fontWeight: 700,
-                          fontSize: "0.8rem",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Edit
-                      </button>
+                      {isAdmin && (
+                        <>
+                          <button
+                            onClick={() => openEditModal(broker)}
+                            style={{
+                              flex: 1,
+                              padding: "0.5rem",
+                              borderRadius: "0.375rem",
+                              background: "#0284c7",
+                              border: "none",
+                              color: "#ffffff",
+                              fontWeight: 700,
+                              fontSize: "0.8rem",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Edit
+                          </button>
 
-                      <button
-                        onClick={() => setDeleteConfirmBroker(broker)}
-                        style={{
-                          padding: "0.5rem 0.85rem",
-                          borderRadius: "0.375rem",
-                          background: "rgba(239, 68, 68, 0.15)",
-                          border: "1px solid rgba(239, 68, 68, 0.3)",
-                          color: "#fca5a5",
-                          fontWeight: 700,
-                          fontSize: "0.8rem",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Delete
-                      </button>
+                          <button
+                            onClick={() => setDeleteConfirmBroker(broker)}
+                            style={{
+                              padding: "0.5rem 0.85rem",
+                              borderRadius: "0.375rem",
+                              background: "rgba(239, 68, 68, 0.15)",
+                              border: "1px solid rgba(239, 68, 68, 0.3)",
+                              color: "#fca5a5",
+                              fontWeight: 700,
+                              fontSize: "0.8rem",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </section>
-        )}
       </div>
 
       {/* Modal: Create / Edit Broker */}
