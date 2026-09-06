@@ -11,7 +11,7 @@ services:
     rootDir: backend
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: alembic upgrade head && gunicorn app.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    startCommand: alembic upgrade head && python -m app.database.seed_db && gunicorn app.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -35,6 +35,8 @@ services:
         value: "INFO"
       - key: ENVIRONMENT
         value: "staging"
+      - key: SMS_PROVIDER
+        value: "mock"
   - type: web
     name: algo-trading-frontend
     runtime: static
