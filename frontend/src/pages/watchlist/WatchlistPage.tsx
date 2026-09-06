@@ -254,6 +254,16 @@ export default function WatchlistPage() {
     setTradeRequest({ equity, side });
   };
 
+  const isFiltered = Boolean(searchQuery.trim()) || filter !== 'ALL' || sort !== 'SYMBOL' || onlyWatchlist;
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setFilter('ALL');
+    setSort('SYMBOL');
+    setOnlyWatchlist(false);
+    setNotification('Watchlist filters and search reset to default.');
+    setTimeout(() => setNotification(null), 2500);
+  };
 
   return (
     <div style={{ color: '#f8fafc', fontFamily: 'system-ui, sans-serif' }}>
@@ -485,7 +495,7 @@ export default function WatchlistPage() {
           gap: '1rem',
         }}>
           {/* Search Input */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '240px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '240px', position: 'relative' }}>
             <input
               type="text"
               value={searchQuery}
@@ -496,12 +506,34 @@ export default function WatchlistPage() {
                 background: '#1e293b',
                 border: '1px solid #334155',
                 borderRadius: '0.5rem',
-                padding: '0.55rem 0.85rem',
+                padding: searchQuery ? '0.55rem 2.2rem 0.55rem 0.85rem' : '0.55rem 0.85rem',
                 color: '#f8fafc',
                 fontSize: '0.875rem',
                 outline: 'none',
               }}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                title="Clear search"
+                style={{
+                  position: 'absolute',
+                  right: '0.65rem',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  padding: '0.2rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* Filter Pills */}
@@ -541,27 +573,66 @@ export default function WatchlistPage() {
             ))}
           </div>
 
-          {/* Sort Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Sort:</span>
-            <select
-              value={sort}
-              onChange={e => setSort(e.target.value as WatchlistSort)}
+          {/* Sort Dropdown & Reset Action */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Sort:</span>
+              <select
+                value={sort}
+                onChange={e => setSort(e.target.value as WatchlistSort)}
+                style={{
+                  background: '#1e293b',
+                  border: '1px solid #334155',
+                  borderRadius: '0.375rem',
+                  padding: '0.45rem 0.75rem',
+                  color: '#f8fafc',
+                  fontSize: '0.8rem',
+                  outline: 'none',
+                }}
+              >
+                <option value="SYMBOL">Symbol</option>
+                <option value="PRICE">Price (High to Low)</option>
+                <option value="CHANGE">Change %</option>
+                <option value="STRENGTH">Signal Strength</option>
+              </select>
+            </div>
+
+            {/* Reset Button */}
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              title="Reset all search, filters, and sorting to default"
               style={{
-                background: '#1e293b',
-                border: '1px solid #334155',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.45rem 0.85rem',
                 borderRadius: '0.375rem',
-                padding: '0.45rem 0.75rem',
-                color: '#f8fafc',
-                fontSize: '0.8rem',
-                outline: 'none',
+                fontWeight: 700,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                background: isFiltered ? 'rgba(239, 68, 68, 0.18)' : '#1e293b',
+                border: isFiltered ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid #334155',
+                color: isFiltered ? '#fca5a5' : '#94a3b8',
+                transition: 'all 0.15s ease',
               }}
             >
-              <option value="SYMBOL">Symbol</option>
-              <option value="PRICE">Price (High to Low)</option>
-              <option value="CHANGE">Change %</option>
-              <option value="STRENGTH">Signal Strength</option>
-            </select>
+              <span>🔄</span>
+              <span>Reset</span>
+              {isFiltered && (
+                <span style={{
+                  fontSize: '0.65rem',
+                  padding: '0.1rem 0.35rem',
+                  borderRadius: '0.25rem',
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  marginLeft: '0.25rem',
+                }}>
+                  Active
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -571,10 +642,10 @@ export default function WatchlistPage() {
             <div style={{ padding: '2.5rem', textAlign: 'center', background: '#0f172a', borderRadius: '0.75rem', border: '1px dashed #334155' }}>
               <p style={{ margin: 0, fontSize: '0.95rem', color: '#94a3b8' }}>No equities match your current search or filter criteria.</p>
               <button
-                onClick={() => { setFilter('ALL'); setSearchQuery(''); setOnlyWatchlist(false); }}
+                onClick={handleResetFilters}
                 style={{ marginTop: '0.85rem', padding: '0.45rem 1rem', background: '#0284c7', border: 'none', borderRadius: '0.375rem', color: '#ffffff', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}
               >
-                Reset Filters
+                🔄 Reset Filters
               </button>
             </div>
           ) : (
