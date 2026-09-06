@@ -46,15 +46,26 @@ export const clearActiveSessionScope = (): void => {
 
 export const getSessionStorageKeys = (scope: SessionScope) => STORAGE_KEYS[scope];
 
-export const getSessionToken = (scope = getActiveSessionScope()): string | null =>
-  scope ? localStorage.getItem(STORAGE_KEYS[scope].accessToken) : null;
+export const getSessionToken = (scope = getActiveSessionScope()): string | null => {
+  if (!scope) return null;
+  const token = localStorage.getItem(STORAGE_KEYS[scope].accessToken);
+  if (token) return token;
+  const altScope: SessionScope = scope === 'admin' ? 'trader' : 'admin';
+  return localStorage.getItem(STORAGE_KEYS[altScope].accessToken);
+};
 
-export const getSessionRefreshToken = (scope = getActiveSessionScope()): string | null =>
-  scope ? localStorage.getItem(STORAGE_KEYS[scope].refreshToken) : null;
+export const getSessionRefreshToken = (scope = getActiveSessionScope()): string | null => {
+  if (!scope) return null;
+  const token = localStorage.getItem(STORAGE_KEYS[scope].refreshToken);
+  if (token) return token;
+  const altScope: SessionScope = scope === 'admin' ? 'trader' : 'admin';
+  return localStorage.getItem(STORAGE_KEYS[altScope].refreshToken);
+};
 
 export const getSessionUser = (scope = getActiveSessionScope()): UserResponse | null => {
   if (!scope) return null;
-  const stored = localStorage.getItem(STORAGE_KEYS[scope].userProfile);
+  const stored = localStorage.getItem(STORAGE_KEYS[scope].userProfile) ||
+    localStorage.getItem(STORAGE_KEYS[scope === 'admin' ? 'trader' : 'admin'].userProfile);
   if (!stored) return null;
   try { return JSON.parse(stored) as UserResponse; } catch { return null; }
 };

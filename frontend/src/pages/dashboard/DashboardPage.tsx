@@ -153,7 +153,7 @@ export default function DashboardPage() {
   const zerodhaBroker = registeredBrokers.find((b) => b.broker_type.toLowerCase().includes('zerodha'));
   const angelBroker = registeredBrokers.find((b) => b.broker_type.toLowerCase().includes('angel'));
 
-  const isDhanConnected = Boolean(dhanBroker && dhanBroker.is_active);
+  const isDhanConnected = dhanBroker ? dhanBroker.is_active : true;
   const isZerodhaConnected = Boolean(zerodhaBroker && zerodhaBroker.is_active);
   const isAngelConnected = Boolean(angelBroker && angelBroker.is_active);
 

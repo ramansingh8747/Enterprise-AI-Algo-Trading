@@ -38,7 +38,7 @@ def create_broker(
     status_code=status.HTTP_200_OK,
     response_model=None,
     summary="List all brokers",
-    dependencies=[Depends(RoleChecker([UserRole.ADMIN]))],
+    dependencies=[Depends(RoleChecker([UserRole.ADMIN, UserRole.TRADER]))],
 )
 def list_brokers(
     service: Annotated[BrokerService, Depends(get_broker_service)],
@@ -54,7 +54,7 @@ def list_brokers(
     status_code=status.HTTP_200_OK,
     response_model=None,
     summary="Get broker by ID",
-    dependencies=[Depends(RoleChecker([UserRole.ADMIN]))],
+    dependencies=[Depends(RoleChecker([UserRole.ADMIN, UserRole.TRADER]))],
 )
 def get_broker(
     broker_id: UUID,
