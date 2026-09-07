@@ -1312,12 +1312,18 @@ class UltraFastMomentumScalperStrategy(BaseStrategy):
                     pos_qty = float(getattr(pos, "quantity", 0) or 0)
                     entry_p = float(getattr(pos, "average_price", current_p) or current_p)
 
-                if pos_sym == symbol and pos_qty > 0:
+                is_match = (
+                    pos_sym == symbol
+                    or (pos_sym and pos_sym.startswith(symbol))
+                    or (pos_sym and symbol in ("NIFTY", "NIFTY50", "BANKNIFTY", "SENSEX") and symbol in pos_sym)
+                )
+                if is_match and pos_qty > 0:
                     is_index = symbol in ("NIFTY", "NIFTY50", "BANKNIFTY", "NIFTYBANK", "SENSEX", "BSESENSEX")
-                    if is_index and entry_p < 1000 and current_p > 5000:
+                    is_option = "-OPT" in (pos_sym or "") or (is_index and entry_p < 1000 and current_p > 5000)
+                    if is_option:
                         # Real Option Delta Formula (Delta = 0.50 for ATM Options)
-                        entry_spot = entry_p / 0.0055
-                        eval_price = max(5.0, round(entry_p + (current_p - entry_spot) * 0.50, 2))
+                        entry_spot = entry_p / 0.0055 if entry_p > 50 else current_p
+                        eval_price = max(1.0, round(entry_p + (current_p - entry_spot) * 0.50, 2))
                         curr_gain_pct = ((eval_price - entry_p) / entry_p) * 100.0 if entry_p > 0 else 0.0
                     else:
                         eval_price = current_p
@@ -1327,7 +1333,7 @@ class UltraFastMomentumScalperStrategy(BaseStrategy):
                     if curr_gain_pct <= -self.stop_loss_pct:
                         self.scalper_high_water_marks.pop(symbol, None)
                         return {
-                            "symbol": symbol,
+                            "symbol": pos_sym,
                             "side": "SELL",
                             "quantity": Decimal(str(pos_qty)),
                             "order_type": "MARKET",
@@ -1351,7 +1357,7 @@ class UltraFastMomentumScalperStrategy(BaseStrategy):
                         if eval_price <= trailing_sl_price:
                             self.scalper_high_water_marks.pop(symbol, None)
                             return {
-                                "symbol": symbol,
+                                "symbol": pos_sym,
                                 "side": "SELL",
                                 "quantity": Decimal(str(pos_qty)),
                                 "order_type": "MARKET",
@@ -1367,7 +1373,7 @@ class UltraFastMomentumScalperStrategy(BaseStrategy):
                     if MarketTimingGuard.is_hero_zero_hard_exit_time():
                         self.scalper_high_water_marks.pop(symbol, None)
                         return {
-                            "symbol": symbol,
+                            "symbol": pos_sym,
                             "side": "SELL",
                             "quantity": Decimal(str(pos_qty)),
                             "order_type": "MARKET",
@@ -1415,6 +1421,7 @@ class UltraFastMomentumScalperStrategy(BaseStrategy):
 
             is_index = trade_symbol in ("NIFTY", "NIFTY50", "BANKNIFTY", "NIFTYBANK", "SENSEX", "BSESENSEX", "FINNIFTY", "MIDCPNIFTY")
             if is_index:
+                contract_symbol = f"{trade_symbol}-OPT-CE"
                 if is_hz_slot:
                     # Afternoon Hero-Zero OTM Option (Dynamic Multi-Bucket Budget: self.hero_zero_budget)
                     exec_price = Decimal("20.00")
@@ -1434,6 +1441,7 @@ class UltraFastMomentumScalperStrategy(BaseStrategy):
                     lot_cost = float(exec_price) * lot_size
                     num_lots = max(1, int(self.morning_budget / lot_cost)) if lot_cost > 0 else 1
                     opt_qty = Decimal(str(num_lots * lot_size))
+                trade_symbol = contract_symbol
             else:
                 exec_price = Decimal(str(round(current_p, 2)))
                 opt_qty = self.quantity

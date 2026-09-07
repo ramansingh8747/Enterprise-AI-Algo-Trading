@@ -187,6 +187,14 @@ class PortfolioValuationService:
                     last_price = Decimal(str(position.last_price or position.average_price or "0.0000"))
 
             avg = Decimal(str(position.average_price))
+            sym_upper = position.symbol.upper()
+            is_option = "-OPT" in sym_upper or (avg < Decimal("1000") and any(idx in sym_upper for idx in ("NIFTY", "BANKNIFTY", "SENSEX")))
+            if is_option and last_price > Decimal("2000"):
+                # Spot index price was fetched instead of option contract price; guard against multi-lakh distortion
+                last_price = Decimal(str(position.last_price or position.average_price or "20.00"))
+                if last_price > Decimal("2000"):
+                    last_price = avg
+
             position.last_price = last_price
             position.market_value = (qty * last_price).quantize(MONEY_PRECISION)
             position.unrealized_pnl = ((last_price - avg) * qty).quantize(MONEY_PRECISION)

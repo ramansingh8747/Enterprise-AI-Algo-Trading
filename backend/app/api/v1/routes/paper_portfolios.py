@@ -239,6 +239,24 @@ STOCK_PRICES = {
 }
 
 
+
+def _resolve_paper_pos_price(pos) -> Decimal:
+    """Resolves realistic live price for PaperPosition with Dhan-aligned Option Delta support."""
+    sym_upper = str(pos.symbol or "").upper()
+    avg = pos.average_price or Decimal("0.0000")
+    is_option = "-OPT" in sym_upper or (avg < Decimal("1000") and any(idx in sym_upper for idx in ("NIFTY", "BANKNIFTY", "SENSEX")))
+
+    if is_option:
+        # Option contract: guard strictly against raw index spot price contamination (e.g. 24,000 / 57,000)
+        if pos.last_price and Decimal("0") < pos.last_price < Decimal("1500"):
+            return pos.last_price
+        return avg if avg > Decimal("0") else Decimal("20.00")
+
+    sym_clean = sym_upper.replace("NSE:", "").replace("BSE:", "")
+    curr_px = STOCK_PRICES.get(sym_clean, pos.last_price or avg)
+    return curr_px if (curr_px and curr_px > Decimal("0")) else avg
+
+
 @router.get(
     "/positions/user-all",
     status_code=status.HTTP_200_OK,
@@ -257,8 +275,7 @@ def get_all_user_paper_positions(
 
     for pos in positions:
         if pos.unrealized_pnl == Decimal("0.0000") and pos.quantity > Decimal("0.0000"):
-            sym_clean = pos.symbol.upper().replace("NSE:", "").replace("BSE:", "")
-            curr_px = STOCK_PRICES.get(sym_clean, pos.last_price or pos.average_price)
+            curr_px = _resolve_paper_pos_price(pos)
             if curr_px and curr_px > Decimal("0"):
                 pos.last_price = curr_px
                 pos.market_value = (pos.quantity * curr_px).quantize(Decimal("0.0001"))
@@ -286,10 +303,7 @@ def get_all_user_paper_summary(
         total_realized += pos.realized_pnl
         if pos.quantity > Decimal("0.0000"):
             if pos.unrealized_pnl == Decimal("0.0000"):
-                curr_px = pos.last_price
-                if not curr_px or curr_px == Decimal("0.0000"):
-                    sym_clean = pos.symbol.upper().replace("NSE:", "").replace("BSE:", "")
-                    curr_px = STOCK_PRICES.get(sym_clean, pos.average_price)
+                curr_px = _resolve_paper_pos_price(pos)
                 if curr_px and curr_px > Decimal("0"):
                     pos.last_price = curr_px
                     pos.market_value = (pos.quantity * curr_px).quantize(Decimal("0.0001"))
