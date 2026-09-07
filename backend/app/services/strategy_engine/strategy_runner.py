@@ -586,7 +586,7 @@ class StrategyRunner:
                         reentry_cooldown_seconds = int(cfg["cooldown_seconds"])
                     else:
                         from app.core.config.settings import settings
-                        reentry_cooldown_seconds = getattr(settings, "STRATEGY_DEFAULT_COOLDOWN_SECONDS", 300)
+                        reentry_cooldown_seconds = getattr(settings, "STRATEGY_DEFAULT_COOLDOWN_SECONDS", 900)
 
                     if min_holding_seconds == 0 and reentry_cooldown_seconds > 0:
                         min_holding_seconds = min(reentry_cooldown_seconds, 60)
@@ -642,7 +642,7 @@ class StrategyRunner:
 
         if reentry_cooldown_seconds <= 0:
             from app.core.config.settings import settings
-            reentry_cooldown_seconds = getattr(settings, "STRATEGY_DEFAULT_COOLDOWN_SECONDS", 300)
+            reentry_cooldown_seconds = getattr(settings, "STRATEGY_DEFAULT_COOLDOWN_SECONDS", 900)
 
         # Query authoritative open position quantity
         current_qty = self._get_open_position_quantity(user_id=user_id, instance=instance, symbol=symbol)
@@ -794,8 +794,8 @@ class StrategyRunner:
             except Exception as e:
                 logger.debug("Failed checking daily completion lock: %s", e)
 
-        # 5. Trade Cooldown & Anti-Whipsaw Guard (Premature Flip-Flop Protection)
-        # Case A: If BUY signal (new entry/re-entry) and cooldown is enabled -> Suppress rapid re-entry
+        # 5. Trade Cooldown & Anti-Whipsaw Guard (Post-Exit & Anti-Churning Protection)
+        # Case A: If BUY signal (new entry/re-entry) and cooldown is enabled -> Suppress rapid re-entry after any trade (especially post-exit)
         if side == "BUY" and reentry_cooldown_seconds > 0 and hasattr(self._repository, "has_recent_execution_or_signal"):
             try:
                 res = self._repository.has_recent_execution_or_signal(
@@ -803,12 +803,12 @@ class StrategyRunner:
                     symbol=symbol,
                     cooldown_seconds=reentry_cooldown_seconds,
                     user_id=user_id,
-                    side=side,
+                    side=None,
                 )
                 if res is True or (not isinstance(res, MagicMock) and bool(res)):
-                    logger.debug(
-                        "Trade cooldown active for strategy instance %s and symbol %s (cooldown: %ss). Suppressing rapid re-entry/whipsaw.",
-                        instance_id, symbol, reentry_cooldown_seconds
+                    logger.info(
+                        "Trade cooldown active for symbol %s (cooldown: %ss). Suppressing rapid re-entry/overtrading.",
+                        symbol, reentry_cooldown_seconds
                     )
                     return None
             except Exception as e:

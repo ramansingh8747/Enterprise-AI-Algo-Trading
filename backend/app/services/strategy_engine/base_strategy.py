@@ -888,8 +888,10 @@ class OpeningRangeBreakoutStrategy(BaseStrategy):
 
         prev_close = float(market_data.get("previous_close") or market_data.get("previousClose") or price_flt)
         orb_high = float(market_data.get("high") or (prev_close * 1.005))
+        orb_low = float(market_data.get("low") or (prev_close * 0.995))
+        buffer = self.breakout_buffer_pct / 100.0
 
-        if price_flt >= orb_high * (1.0 + (self.breakout_buffer_pct / 100.0)) or change_pct >= 0.0:
+        if price_flt >= orb_high * (1.0 + buffer):
             return {
                 "symbol": symbol,
                 "side": "BUY",
@@ -897,7 +899,7 @@ class OpeningRangeBreakoutStrategy(BaseStrategy):
                 "order_type": "MARKET",
                 "price": price,
             }
-        else:
+        elif price_flt <= orb_low * (1.0 - buffer):
             return {
                 "symbol": symbol,
                 "side": "SELL",
@@ -905,6 +907,7 @@ class OpeningRangeBreakoutStrategy(BaseStrategy):
                 "order_type": "MARKET",
                 "price": price,
             }
+        return None
 
 
 # ---------------------------------------------------------------------------

@@ -61,11 +61,15 @@ class MarketTimingGuard:
             day_name = "Saturday" if ist_dt.weekday() == 5 else "Sunday"
             return False, f"Market is closed on weekends ({day_name})"
 
-        # Parse session start (09:15) and cutoff (15:15)
+        # Parse session start (09:15), entry start (09:30), and cutoff (15:15)
         start_hour, start_min = map(int, settings.MARKET_OPEN_TIME_IST.split(":"))
+        entry_start_hour, entry_start_min = map(
+            int, getattr(settings, "MARKET_ENTRY_START_TIME_IST", "09:30").split(":")
+        )
         cutoff_hour, cutoff_min = map(int, settings.MARKET_NEW_ORDER_CUTOFF_IST.split(":"))
 
         session_start = time(start_hour, start_min)
+        entry_start = time(entry_start_hour, entry_start_min)
         session_cutoff = time(cutoff_hour, cutoff_min)
         current_time = ist_dt.time()
 
@@ -73,6 +77,13 @@ class MarketTimingGuard:
             return (
                 False,
                 f"Market not yet open (Current IST: {current_time.strftime('%H:%M:%S')}, Opens at {settings.MARKET_OPEN_TIME_IST} AM IST)",
+            )
+
+        # Opening Volatility Filter: Avoid morning whipsaws (09:15 - 09:30 AM IST)
+        if current_time < entry_start:
+            return (
+                False,
+                f"Opening volatility filter active: New order entries permitted after {getattr(settings, 'MARKET_ENTRY_START_TIME_IST', '09:30')} AM IST (Current IST: {current_time.strftime('%H:%M:%S')})",
             )
 
         if current_time > session_cutoff:

@@ -45,3 +45,17 @@ def test_market_timing_guard_disabled_returns_true():
     post_market_time = datetime(2026, 8, 19, 11, 21, 0, tzinfo=timezone.utc)
     is_open, msg = MarketTimingGuard.is_market_open_for_new_orders(post_market_time, enforce_hours=False)
     assert is_open is True
+
+
+def test_market_timing_guard_blocks_opening_15_minutes():
+    """Wednesday 09:20 AM IST must be blocked by opening volatility filter (before 09:30 AM)."""
+    # 09:20 AM IST = 03:50 AM UTC
+    opening_chop_time = datetime(2026, 8, 19, 3, 50, 0, tzinfo=timezone.utc)
+    is_open, msg = MarketTimingGuard.is_market_open_for_new_orders(opening_chop_time, enforce_hours=True)
+    assert is_open is False
+    assert "volatility filter" in msg.lower() or "09:30" in msg
+
+    # But exits at 09:20 AM IST must be permitted
+    can_exit, exit_msg = MarketTimingGuard.is_market_open_for_exits(opening_chop_time, enforce_hours=True)
+    assert can_exit is True
+

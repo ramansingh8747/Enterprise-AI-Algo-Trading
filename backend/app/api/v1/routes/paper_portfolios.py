@@ -4,7 +4,7 @@ from uuid import UUID
 from decimal import Decimal
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
 from app.api.v1.routes.auth import get_current_active_user
 from app.schemas.auth import UserResponse
@@ -148,8 +148,6 @@ def reset_paper_portfolio(
             else:
                 p.cash_balance = p.initial_balance
             p.realized_pnl = Decimal("0.0000")
-            p.unrealized_pnl = Decimal("0.0000")
-            p.total_pnl = Decimal("0.0000")
             repository.db.add(p)
         repository.db.commit()
     else:
@@ -176,10 +174,20 @@ def reset_paper_portfolio(
             else:
                 portfolio.cash_balance = portfolio.initial_balance
             portfolio.realized_pnl = Decimal("0.0000")
-            portfolio.unrealized_pnl = Decimal("0.0000")
-            portfolio.total_pnl = Decimal("0.0000")
-            repository.db.add(portfolio)
-            repository.db.commit()
+        from app.database.models.strategy import StrategyInstance, StrategySignal
+        repository.db.execute(
+            update(StrategyInstance)
+            .where(
+                StrategyInstance.user_id == current_user.id,
+                StrategyInstance.execution_mode == "PAPER",
+                StrategyInstance.status == "RUNNING",
+            )
+            .values(status="PAUSED")
+        )
+        repository.db.execute(
+            delete(StrategySignal).where(StrategySignal.user_id == current_user.id)
+        )
+        repository.db.commit()
 
     if not portfolio:
         raise HTTPException(
